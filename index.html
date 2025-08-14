@@ -59,14 +59,26 @@
             }
 
             try {
-                const constraints = { video: { facingMode: { ideal: "environment" } } };
-                webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
-                document.getElementById("webcam").srcObject = webcamStream;
-                console.log("✅ Camera started successfully");
-            } catch (err) {
-                logError("Camera could not start. Possible reasons: no HTTPS, permission denied, or no camera available.");
-                return;
-            }
+    let constraints = { video: { facingMode: { ideal: "environment" } } }; 
+                
+    try {
+        // Try rear camera first
+        webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log("✅ Rear camera started successfully");
+    } catch (rearErr) {
+        console.warn("Rear camera failed, trying front camera...");
+        // If rear camera fails, try front camera
+        constraints = { video: { facingMode: "user" } };
+        webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log("✅ Front camera started successfully");
+    }
+
+    document.getElementById("webcam").srcObject = webcamStream;
+
+} catch (err) {
+    logError("Camera could not start. Possible reasons: no HTTPS, permission denied, or no camera available.");
+    return;
+}
         }
 
         document.getElementById("captureBtn").addEventListener("click", async () => {
@@ -118,4 +130,5 @@
     </script>
 </body>
 </html>
+
 
