@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Monster Transform Game - Debug Mode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #222; color: #fff; }
+        h1 { margin-top: 20px; }
+        video, img { max-width: 90%; margin-top: 10px; border: 4px solid #fff; border-radius: 10px; }
+        button { padding: 10px 20px; font-size: 16px; margin-top: 15px; cursor: pointer; border-radius: 5px; }
+        .monster-card { margin-top: 20px; padding: 15px; background: #333; border-radius: 10px; display: inline-block; }
+        .monster-card img { width: 200px; height: auto; border-radius: 10px; }
+        .stats { margin-top: 10px; text-align: left; }
+        #errorLog { background: #a00; padding: 10px; border-radius: 5px; margin: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <h1>Monster Transform Game</h1>
+    <p>Take a picture of an animal to see its monster form!</p>
+
+    <div id="errorLog"></div>
+
+    <video id="webcam" autoplay playsinline></video><br>
+    <button id="captureBtn">📸 Capture Photo</button>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div id="result"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image"></script>
+    <script>
+        const URL = "model_real/";
+        let model, webcamStream;
+
+        const monsterData = {
+            ladybug: { image: "digital_images/ladybug.png", type: "Tank" },
+            squirrel: { image: "digital_images/squirrel.png", type: "Rogue" },
+            dog: { image: "digital_images/dog.png", type: "Brawler" },
+            cat: { image: "digital_images/cat.png", type: "Assassin" },
+            spider: { image: "digital_images/spider.png", type: "Trapper" },
+            fly: { image: "digital_images/fly.png", type: "Scout" }
+        };
+
+        function logError(msg) {
+            const logBox = document.getElementById("errorLog");
+            logBox.style.display = "block";
+            logBox.innerHTML = `<strong>Error:</strong> ${msg}`;
+            console.error(msg);
+        }
+
+        async function init() {
+            try {
+                model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+                console.log("✅ Model loaded successfully");
+            } catch (err) {
+                logError("Failed to load model. Check that model_real/ contains model.json, metadata.json, weights.bin.");
+                return;
+            }
+
+            try {
+                const constraints = { video: { facingMode: { ideal: "environment" } } };
+                webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+                document.getElementById("webcam").srcObject = webcamStream;
+                console.log("✅ Camera started successfully");
+            } catch (err) {
+                logError("Camera could not start. Possible reasons: no HTTPS, permission denied, or no camera available.");
+                return;
+            }
+        }
+
+        document.getElementById("captureBtn").addEventListener("click", async () => {
+            if (!webcamStream) {
+                logError("No webcam stream available.");
+                return;
+            }
+            const videoElement = document.getElementById("webcam");
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            ctx.drawImage(videoElement, 0, 0);
+
+            webcamStream.getTracks().forEach(track => track.stop());
+
+            try {
+                const prediction = await model.predict(canvas);
+                prediction.sort((a, b) => b.probability - a.probability);
+                const top = prediction[0].className.toLowerCase();
+
+                if (monsterData[top]) {
+                    showMonster(top);
+                } else {
+                    document.getElementById("result").innerHTML = `<p>No matching monster found for "${top}".</p>`;
+                }
+            } catch (err) {
+                logError("Prediction failed. Model might not match your image input size.");
+            }
+        });
+
+        function showMonster(name) {
+            const monster = monsterData[name];
+            const health = Math.floor(Math.random() * 51) + 50;
+            const attack = Math.floor(Math.random() * 51) + 20;
+            document.getElementById("result").innerHTML = `
+                <div class="monster-card">
+                    <h2>${name.toUpperCase()} — ${monster.type}</h2>
+                    <img src="${monster.image}" alt="${name}">
+                    <div class="stats">
+                        <p><strong>Health:</strong> ${health}</p>
+                        <p><strong>Attack:</strong> ${attack}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        init();
+    </script>
+</body>
+</html>
