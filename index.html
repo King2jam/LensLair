@@ -31,6 +31,23 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image"></script>
     <script>
         const URL = "model_real/";
+        // Debug: Check if model files exist before loading
+(async () => {
+    const files = ["model.json", "metadata.json", "weights.bin"];
+    for (const file of files) {
+        try {
+            const res = await fetch(`${URL}${file}`);
+            if (res.ok) {
+                console.log(`✅ Found: ${file}`);
+            } else {
+                console.error(`❌ Missing or not accessible: ${file}`);
+            }
+        } catch (err) {
+            console.error(`⚠️ Error fetching ${file}:`, err);
+        }
+    }
+})();
+
         let model, webcamStream;
 
         const monsterData = {
@@ -130,5 +147,6 @@
     </script>
 </body>
 </html>
+
 
 
