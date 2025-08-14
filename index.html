@@ -51,7 +51,7 @@
 
         async function init() {
             try {
-                model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+                model = await tmImage.load("model_real/model.json", "model_real/metadata.json");
                 console.log("✅ Model loaded successfully");
             } catch (err) {
                 logError("Failed to load model. Check that model_real/ contains model.json, metadata.json, weights.bin.");
@@ -118,3 +118,4 @@
     </script>
 </body>
 </html>
+
