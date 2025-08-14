@@ -74,7 +74,30 @@
                 logError("Failed to load model. Check that model_real/ contains model.json, metadata.json, weights.bin.");
                 return;
             }
+async function init() {
+    try {
+        // Try rear camera first
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
+        webcam.srcObject = stream;
+    } catch (err) {
+        logError(`Rear camera could not start: ${err.name} — ${err.message}`);
+        console.error("Full rear camera error:", err);
 
+        try {
+            // Fallback to front camera
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" }
+            });
+            webcam.srcObject = stream;
+        } catch (err2) {
+            logError(`Front camera could not start: ${err2.name} — ${err2.message}`);
+            console.error("Full front camera error:", err2);
+            return;
+        }
+    }
+}
             try {
     let constraints = { video: { facingMode: { ideal: "environment" } } }; 
                 
@@ -93,7 +116,8 @@
     document.getElementById("webcam").srcObject = webcamStream;
 
 } catch (err) {
-    logError("Camera could not start. Possible reasons: no HTTPS, permission denied, or no camera available.");
+    logError(`Camera could not start: ${err.name} — ${err.message}`);
+    console.error("Full camera error:", err);
     return;
 }
         }
@@ -147,6 +171,7 @@
     </script>
 </body>
 </html>
+
 
 
 
