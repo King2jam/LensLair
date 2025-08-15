@@ -1,39 +1,531 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Monster Transform Game</title>
+  <meta charset="UTF-8" />
+  <title>Monster Transform — PvPvE Prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<!-- ====== Styles ====== -->
-<style>
-  :root{
-    --bg:#121212; --panel:#1b1b1b; --ink:#f5f5f5; --muted:#9aa0a6;
-    --brand:#4f8cff; --ok:#17c964; --warn:#ffb020; --bad:#ef4444;
-    --chip:#2a2a2a; --card:#202225; --border:#2c2c2c;
+  <style>
+    :root{
+      --bg:#111; --panel:#181a1f; --ink:#e8e8e8; --muted:#a6a6a6; --accent:#61dafb; --warn:#ffb020; --ok:#2ecc71; --bad:#ff5c5c;
+      --btn:#262a33; --btn2:#1e2230;
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;background:var(--bg);color:var(--ink)}
+    header{padding:16px 12px;text-align:center;border-bottom:1px solid #20242c;background:linear-gradient(180deg,#14161b,#0f1116)}
+    h1{margin:6px 0 4px;font-size:22px}
+    .sub{color:var(--muted);font-size:14px}
+    .wrap{max-width:980px;margin:0 auto;padding:14px}
+    .grid{display:grid;gap:14px;grid-template-columns:1fr}
+    @media(min-width:960px){.grid{grid-template-columns:1.2fr .8fr}}
+    .card{background:var(--panel);border:1px solid #23262f;border-radius:14px;padding:12px;box-shadow:0 6px 24px rgba(0,0,0,.28)}
+    video,canvas{width:100%;max-height:60vh;border-radius:10px;background:#000}
+    .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+    button{
+      appearance:none;border:1px solid #2a2e3a;background:var(--btn);color:var(--ink);padding:10px 14px;border-radius:10px;
+      cursor:pointer;font-weight:600
+    }
+    button.primary{background:var(--btn2);border-color:#2f3646}
+    button.bad{border-color:#3a2a2a;background:#2a1919}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .error{background:#3a1212;border:1px solid #5b1e1e;color:#ffdcdc;padding:10px;border-radius:8px;margin:8px 0;display:none}
+    .ok{color:var(--ok)}
+    .warn{color:var(--warn)}
+    .kvs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+    .kv{background:#20232b;padding:8px;border-radius:8px}
+    .kv strong{display:block;font-size:12px;color:var(--muted)}
+    .kv span{font-size:16px}
+    .monster-card{display:flex;gap:14px;align-items:flex-start}
+    .monster-card img{width:160px;height:160px;object-fit:contain;border-radius:12px;background:#0c0e12;border:1px solid #2a2e3a}
+    .muted{color:var(--muted)}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#222a;color:#cfe}
+    hr.sep{border:0;border-top:1px solid #2a2e3a;margin:10px 0}
+    .section-title{font-weight:700;margin:4px 0 8px}
+    .list{display:flex;flex-wrap:wrap;gap:8px}
+    .slot{padding:8px 10px;border:1px dashed #344;color:#bcd;border-radius:10px;min-width:88px;text-align:center;background:#131720}
+    .slot.fill{border-style:solid;background:#1a1f2a}
+    .small{font-size:12px}
+    .footer{opacity:.7;text-align:center;padding:10px 0;font-size:12px}
+    .soon{opacity:.6}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Monster Transform</h1>
+    <div class="sub">Snap real creatures → unlock their monster forms. Build a team. PvPvE is coming soon.</div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <!-- LEFT: Camera + Capture -->
+      <section class="card">
+        <div class="section-title">1) Capture</div>
+        <div id="errorBox" class="error"></div>
+
+        <video id="webcam" playsinline muted></video>
+        <canvas id="frameCanvas" style="display:none"></canvas>
+
+        <div class="btnrow">
+          <button id="enableBtn" class="primary">🎥 Enable Camera</button>
+          <button id="captureBtn" disabled>📸 Capture Photo</button>
+          <button id="flipBtn" title="Try front/back camera" disabled>🔁 Flip</button>
+          <button id="stopBtn" class="bad" disabled>⏹ Stop</button>
+        </div>
+
+        <div class="small muted">
+          Tip: iPhone requires HTTPS + tapping “Enable Camera”. Rear camera is preferred; use “Flip” if needed.
+        </div>
+      </section>
+
+      <!-- RIGHT: Result / Card -->
+      <section class="card" id="resultPanel">
+        <div class="section-title">2) Monster Card</div>
+        <div id="resultArea" class="muted">Take a photo to reveal your monster.</div>
+      </section>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <!-- LEFT: Team / Best Pal -->
+      <section class="card">
+        <div class="section-title">Team (3 slots) & Best Pal</div>
+        <div id="teamRow" class="list"></div>
+        <div class="btnrow" style="margin-top:8px">
+          <button id="clearTeamBtn">🧹 Clear Team</button>
+          <button id="clearAllBtn" class="bad">🗑️ Clear All Data</button>
+        </div>
+      </section>
+
+      <!-- RIGHT: Coming soon / Shards -->
+      <section class="card">
+        <div class="section-title">Modes</div>
+        <div class="btnrow">
+          <button disabled class="soon">⚔️ PvP (Online) — Coming Soon</button>
+          <button disabled class="soon">🛡️ Co-Op Raids — Coming Soon</button>
+          <button disabled class="soon">📖 Story — Coming Soon</button>
+        </div>
+        <hr class="sep" />
+        <div class="section-title">Your Shards</div>
+        <div id="shardList" class="list small"></div>
+      </section>
+    </div>
+
+    <div class="footer">Prototype saves to your device (localStorage). Add more monsters in the MONSTER_CONFIG section in this file.</div>
+  </div>
+
+  <!-- TFJS + Teachable Machine (pinned versions) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
+
+  <script>
+  /******************************************************************
+   * SECTION: CONFIG — EDIT HERE TO ADD MORE MONSTERS
+   * Search for: MONSTER_CONFIG, RARITY_TABLE, ROLE_BASES, ELEMENT_MODS
+   ******************************************************************/
+
+  // Where your local TM model lives (exact filenames required).
+  const MODEL_DIR = "model_real/";
+
+  // Simple mapping helper: normalize TM labels to keys like "ladybug".
+  const norm = s => String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+  // === MONSTER_CONFIG =================================================
+  // Add your new animals here. Key must match your TM label after normalize.
+  // imageBase is the filename without extension; code will try .png → .jpg → .jpeg automatically.
+  const MONSTER_CONFIG = {
+    ladybug:  { display:"Ladybug",  role:"Tank",      element:"Light",  imageBase:"ladybug"  },
+    squirrel: { display:"Squirrel", role:"Speedster", element:"Nature", imageBase:"squirrel" },
+    dog:      { display:"Dog",      role:"Guardian",  element:"Earth",  imageBase:"dog"      },
+    cat:      { display:"Cat",      role:"Assassin",  element:"Shadow", imageBase:"cat"      },
+    spider:   { display:"Spider",   role:"Trapper",   element:"Poison", imageBase:"spider"   },
+    fly:      { display:"Fly",      role:"Scout",     element:"Air",    imageBase:"fly"      }
+  };
+
+  // === RARITY_TABLE (probabilities sum to 100) =======================
+  // Ensures "Rare" is < 5% as requested (we also have Epic & Legendary very low).
+  const RARITY_TABLE = [
+    { tier:"Common",    prob:70, mult:1.00, color:"#b8c4d6" },
+    { tier:"Uncommon",  prob:25, mult:1.05, color:"#7cd992" },
+    { tier:"Rare",      prob: 4, mult:1.15, color:"#5aa3ff" },
+    { tier:"Epic",      prob: 0.9, mult:1.30, color:"#b889ff" },
+    { tier:"Legendary", prob: 0.1, mult:1.50, color:"#ffb457" }
+  ];
+
+  // === ROLE_BASES (per role, min-max ranges) =========================
+  // HP, ATK, DEF, SPD, CRIT, RESIST (percent; we display as % where makes sense).
+  const ROLE_BASES = {
+    Guardian:  { HP:[85,110], ATK:[40,60],  DEF:[70,95],  SPD:[35,55], CRIT:[5,10],  RESIST:[10,18] },
+    Assassin:  { HP:[55,75],  ATK:[75,100], DEF:[35,55],  SPD:[80,100],CRIT:[18,28], RESIST:[5,10]  },
+    Tank:      { HP:[100,130],ATK:[35,55],  DEF:[85,110], SPD:[30,45], CRIT:[4,8],   RESIST:[12,20] },
+    Trapper:   { HP:[65,85],  ATK:[55,75],  DEF:[55,75],  SPD:[55,75], CRIT:[10,16], RESIST:[8,14]  },
+    Scout:     { HP:[50,70],  ATK:[45,65],  DEF:[35,55],  SPD:[95,120],CRIT:[12,20], RESIST:[6,10]  },
+    Speedster: { HP:[60,80],  ATK:[55,75],  DEF:[45,60],  SPD:[105,130],CRIT:[14,22],RESIST:[6,12]  }
+  };
+
+  // === ELEMENT_MODS (adds flavor by element) =========================
+  // Values are additive (HP/ATK/DEF/SPD) or % points (CRIT/RESIST).
+  const ELEMENT_MODS = {
+    Nature:{ HP:+5,  ATK:+2, DEF:+4, SPD:+0,  CRIT:+0, RESIST:+2 },
+    Earth: { HP:+8,  ATK:+0, DEF:+6, SPD:-2, CRIT:-1, RESIST:+3 },
+    Shadow:{ HP:+0,  ATK:+6, DEF:-2,SPD:+2,  CRIT:+3, RESIST:+0 },
+    Light: { HP:+4,  ATK:+2, DEF:+3, SPD:+0, CRIT:+1, RESIST:+2 },
+    Poison:{ HP:+0,  ATK:+3, DEF:+1, SPD:+0, CRIT:+1, RESIST:+3 },
+    Air:   { HP:-2,  ATK:+1, DEF:-1, SPD:+6, CRIT:+2, RESIST:+0 }
+  };
+
+  // === CLASS ADVANTAGE CHART (element vs element) ====================
+  // Positive numbers = damage boost, negatives = resistance.
+  const ELEM_ADV = {
+    Nature:{ Air:+10, Poison:-10, Earth:+0, Light:+0, Shadow:+0, Nature:+0 },
+    Earth: { Poison:+10, Air:-10, Nature:+0, Light:+0, Shadow:+0, Earth:+0 },
+    Shadow:{ Light:+10, Nature:-10, Earth:+0, Poison:+0, Air:+0, Shadow:+0 },
+    Light: { Shadow:+10, Poison:-10, Nature:+0, Earth:+0, Air:+0, Light:+0 },
+    Poison:{ Nature:+10, Earth:-10, Air:+0, Light:+0, Shadow:+0, Poison:+0 },
+    Air:   { Earth:+10, Nature:-10, Poison:+0, Light:+0, Shadow:+0, Air:+0 }
+  };
+
+  /******************************************************************
+   * SECTION: STATE / STORAGE
+   ******************************************************************/
+  const $ = sel => document.querySelector(sel);
+  const state = {
+    stream: null,
+    facing: "environment",
+    model: null
+  };
+
+  const store = {
+    getMonsters(){ return JSON.parse(localStorage.getItem("monsters")||"[]"); },
+    setMonsters(v){ localStorage.setItem("monsters", JSON.stringify(v)); },
+    getTeam(){ return JSON.parse(localStorage.getItem("team")||"[]"); }, // ids
+    setTeam(v){ localStorage.setItem("team", JSON.stringify(v.slice(0,3))); },
+    getFav(){ return localStorage.getItem("favoriteId") || ""; },
+    setFav(id){ localStorage.setItem("favoriteId", id||""); },
+    getShards(){ return JSON.parse(localStorage.getItem("shards")||"{}"); },
+    setShards(v){ localStorage.setItem("shards", JSON.stringify(v)); },
+    clearAll(){ localStorage.clear(); }
+  };
+
+  /******************************************************************
+   * SECTION: UTILITIES
+   ******************************************************************/
+  // Weighted rarity roll
+  function rollRarity(){
+    const r = Math.random()*100;
+    let acc=0;
+    for(const t of RARITY_TABLE){ acc += t.prob; if(r < acc) return t; }
+    return RARITY_TABLE[0];
   }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  // Random in [min,max]
+  const rint = ([min,max]) => Math.round(min + Math.random()*(max-min));
+
+  // Create unique id
+  function uid(){ return Date.now().toString(36)+"-"+Math.random().toString(16).slice(2,8); }
+
+  // Build stats from role + element + rarity
+  function buildStats(role, element){
+    const base = ROLE_BASES[role] || ROLE_BASES.Guardian;
+    const rar = rollRarity();
+    const mod = ELEMENT_MODS[element] || {HP:0,ATK:0,DEF:0,SPD:0,CRIT:0,RESIST:0};
+
+    let stats = {
+      HP: rint(base.HP) + mod.HP,
+      ATK: rint(base.ATK) + mod.ATK,
+      DEF: rint(base.DEF) + mod.DEF,
+      SPD: rint(base.SPD) + mod.SPD,
+      CRIT: rint(base.CRIT) + mod.CRIT,
+      RESIST: rint(base.RESIST) + mod.RESIST
+    };
+    // Apply rarity multiplier to core stats (not to % rates too much).
+    const coreMult = rar.mult;
+    stats.HP = Math.round(stats.HP * coreMult);
+    stats.ATK = Math.round(stats.ATK * coreMult);
+    stats.DEF = Math.round(stats.DEF * coreMult);
+    stats.SPD = Math.round(stats.SPD * coreMult);
+    stats.RARITY = rar.tier;
+    stats.RCOLOR = rar.color;
+    return stats;
   }
-  .app{max-width:1100px; margin:0 auto; padding:16px}
-  h1{font-size:24px; margin:4px 0 12px}
-  .subtitle{color:var(--muted); margin-bottom:12px}
 
-  .layout{display:grid; grid-template-columns:1.1fr .9fr; gap:16px}
-  @media (max-width:900px){ .layout{grid-template-columns:1fr} }
-
-  .panel{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px}
-
-  .video-wrap{position:relative; background:#000; border-radius:12px; overflow:hidden; border:1px solid var(--border)}
-  video{width:100%; height:320px; object-fit:cover; background:#000}
-  .controls{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap}
-  button{
-    background:#2b2b2b; border:1px solid var(--border); color:var(--ink);
-    padding:10px 14px; border-radius:12px; font-weight:600; cursor:pointer;
+  // Try .png → .jpg → .jpeg → inline fallback
+  function resolveImageSrc(base){
+    const dir = "digital_images/";
+    const cands = [".png",".jpg",".jpeg"].map(ext=>dir+base+ext);
+    // We'll return the first candidate; <img onerror> will try the next.
+    // The inline fallback is a data-URI SVG saying “MONSTER”.
+    const fallback = 'data:image/svg+xml;utf8,'+encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320">
+        <rect width="100%" height="100%" fill="#0b0f16"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#5aa3ff" font-size="28" font-family="Arial">MONSTER</text>
+      </svg>`
+    );
+    return { cands, fallback };
   }
+
+  function showError(msg){
+    const el = $("#errorBox");
+    el.textContent = msg;
+    el.style.display = "block";
+    console.error(msg);
+  }
+  function clearError(){ const el=$("#errorBox"); el.style.display="none"; el.textContent=""; }
+
+  /******************************************************************
+   * SECTION: CAMERA
+   ******************************************************************/
+  async function startCamera(facing = "environment"){
+    if(!location.protocol.startsWith("https") && location.hostname!=="localhost"){
+      showError("Camera requires HTTPS (GitHub Pages provides it). Open this page via https://");
+      return;
+    }
+    clearError();
+    stopCamera();
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facing } }, audio: false
+      });
+      state.stream = stream;
+      state.facing = facing;
+      const video = $("#webcam");
+      video.srcObject = stream;
+      video.muted = true;
+      await video.play();
+      $("#captureBtn").disabled = false;
+      $("#flipBtn").disabled = false;
+      $("#stopBtn").disabled = false;
+      return true;
+    }catch(err){
+      showError(`Camera error: ${err.name} — ${err.message}`);
+      return false;
+    }
+  }
+  function stopCamera(){
+    $("#captureBtn").disabled = true;
+    $("#flipBtn").disabled = true;
+    $("#stopBtn").disabled = true;
+    const v = $("#webcam");
+    if(state.stream){
+      state.stream.getTracks().forEach(t=>t.stop());
+      state.stream = null;
+    }
+    v.srcObject = null;
+  }
+
+  /******************************************************************
+   * SECTION: MODEL LOAD
+   ******************************************************************/
+  async function loadModel(){
+    try{
+      // Optional quick existence check (helpful on GitHub Pages)
+      for(const f of ["model.json","metadata.json","weights.bin"]){
+        const res = await fetch(MODEL_DIR+f,{cache:"no-store"});
+        if(!res.ok) console.warn(`Model file not accessible: ${f} (HTTP ${res.status})`);
+      }
+      state.model = await tmImage.load(MODEL_DIR+"model.json", MODEL_DIR+"metadata.json");
+      console.log("✅ TM model loaded");
+      return true;
+    }catch(err){
+      showError("Failed to load model. Ensure model_real/ has model.json, metadata.json, weights.bin.");
+      console.error(err);
+      return false;
+    }
+  }
+
+  /******************************************************************
+   * SECTION: GAME / UI
+   ******************************************************************/
+  function renderTeam(){
+    const row = $("#teamRow");
+    row.innerHTML = "";
+    const team = store.getTeam();
+    const fav = store.getFav();
+
+    for(let i=0;i<3;i++){
+      const id = team[i];
+      const div = document.createElement("div");
+      div.className = "slot" + (id ? " fill" : "");
+      if(!id){
+        div.textContent = `Slot ${i+1}`;
+      }else{
+        const all = store.getMonsters();
+        const m = all.find(x=>x.id===id);
+        if(m){
+          div.innerHTML = `<strong>${m.name}</strong><br><span class="small">${m.role} • ${m.element}</span><br><span class="small" style="color:${m.stats.RCOLOR}">${m.stats.RARITY}</span><br>${fav===id?'<span class="pill">Best Pal</span>':''}`;
+        }else{
+          div.textContent = `Slot ${i+1}`;
+        }
+      }
+      row.appendChild(div);
+    }
+  }
+
+  function renderShards(){
+    const list = $("#shardList");
+    const shards = store.getShards();
+    list.innerHTML = "";
+    Object.keys(shards).sort().forEach(k=>{
+      const s = document.createElement("div");
+      s.className = "slot fill";
+      s.textContent = `${k}: ${shards[k]} shards`;
+      list.appendChild(s);
+    });
+    if(!Object.keys(shards).length){
+      const s = document.createElement("div");
+      s.className = "slot";
+      s.textContent = "No shards yet";
+      list.appendChild(s);
+    }
+  }
+
+  function cardHTML(mon){
+    const advAgainst = Object.entries(ELEM_ADV[mon.element]||{})
+      .filter(([,v])=>v>0).map(([k,v])=>`${k}+${v}%`).join(", ") || "—";
+    const weakAgainst = Object.entries(ELEM_ADV[mon.element]||{})
+      .filter(([,v])=>v<0).map(([k,v])=>`${k}${v}%`).join(", ") || "—";
+
+    // Build image source with fallbacks
+    const { cands, fallback } = resolveImageSrc(mon.imageBase);
+    const img1 = cands[0], img2 = cands[1], img3 = cands[2];
+
+    return `
+      <div class="monster-card">
+        <img id="monImg" src="${img1}"
+             onerror="this.onerror=null; this.src='${img2}'; this.onerror=function(){this.onerror=null; this.src='${img3}'; this.onerror=function(){this.src='${fallback}'} }" alt="${mon.name}">
+        <div>
+          <div class="section-title" style="margin-top:2px">${mon.name}
+            <span class="pill" style="margin-left:6px; background:${mon.stats.RCOLOR}22;border:1px solid ${mon.stats.RCOLOR}44;color:${mon.stats.RCOLOR}">
+              ${mon.stats.RARITY}
+            </span>
+          </div>
+          <div class="muted small">${mon.role} • ${mon.element}</div>
+          <div class="kvs">
+            <div class="kv"><strong>HP</strong><span>${mon.stats.HP}</span></div>
+            <div class="kv"><strong>ATK</strong><span>${mon.stats.ATK}</span></div>
+            <div class="kv"><strong>DEF</strong><span>${mon.stats.DEF}</span></div>
+            <div class="kv"><strong>SPD</strong><span>${mon.stats.SPD}</span></div>
+            <div class="kv"><strong>CRIT</strong><span>${mon.stats.CRIT}%</span></div>
+            <div class="kv"><strong>RESIST</strong><span>${mon.stats.RESIST}%</span></div>
+          </div>
+          <div class="small" style="margin-top:8px">
+            <strong>Advantage:</strong> ${advAgainst} &nbsp;&nbsp;
+            <strong>Weak vs:</strong> ${weakAgainst}
+          </div>
+          <div class="btnrow" style="margin-top:10px">
+            <button id="addTeamBtn">➕ Add to Team</button>
+            <button id="favBtn">⭐ Set as Best Pal</button>
+            <button id="breakBtn" class="bad">🧩 Break Down (Shards)</button>
+          </div>
+          <div class="small muted">ID: ${mon.id}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function saveAndShow(mon){
+    const all = store.getMonsters();
+    all.push(mon);
+    store.setMonsters(all);
+
+    $("#resultArea").innerHTML = cardHTML(mon);
+
+    // Hook up buttons
+    $("#addTeamBtn").onclick = ()=>{
+      const team = store.getTeam();
+      if(team.includes(mon.id)) return; // already in
+      if(team.length>=3){ alert("Team full (3). Clear a slot first."); return; }
+      team.push(mon.id);
+      store.setTeam(team);
+      renderTeam();
+    };
+    $("#favBtn").onclick = ()=>{
+      store.setFav(mon.id);
+      renderTeam();
+      alert(`${mon.name} is now your Best Pal!`);
+    };
+    $("#breakBtn").onclick = ()=>{
+      const shards = store.getShards();
+      const key = mon.name;
+      const yieldAmt = ({Common:1,Uncommon:2,Rare:5,Epic:10,Legendary:20})[mon.stats.RARITY] || 1;
+      shards[key] = (shards[key]||0) + yieldAmt;
+      store.setShards(shards);
+      // remove from collection (not from team automatically)
+      const rest = store.getMonsters().filter(x=>x.id!==mon.id);
+      store.setMonsters(rest);
+      renderShards();
+      $("#resultArea").innerHTML = `<div class="ok">You gained ${yieldAmt} ${key} shards.</div>`;
+    };
+  }
+
+  async function onCapture(){
+    if(!state.model){ showError("Model not loaded yet."); return; }
+    if(!state.stream){ showError("No webcam stream available."); return; }
+    clearError();
+
+    const video = $("#webcam");
+    const cvs = $("#frameCanvas");
+    const ctx = cvs.getContext("2d");
+    cvs.width = video.videoWidth || 640;
+    cvs.height = video.videoHeight || 480;
+    ctx.drawImage(video, 0, 0, cvs.width, cvs.height);
+
+    // Predict from canvas
+    let pred;
+    try{
+      pred = await state.model.predict(cvs);
+    }catch(err){
+      showError("Prediction failed. Check model type (Image) and input.");
+      console.error(err);
+      return;
+    }
+    pred.sort((a,b)=>b.probability - a.probability);
+    const top = pred[0];
+    const key = norm(top.className);
+
+    const cfg = MONSTER_CONFIG[key];
+    if(!cfg){
+      $("#resultArea").innerHTML = `<div class="warn">No config found for label “${top.className}”. Add it under MONSTER_CONFIG to map an image & stats.</div>`;
+      return;
+    }
+
+    const stats = buildStats(cfg.role, cfg.element);
+    const monster = {
+      id: uid(),
+      label: top.className,
+      name: cfg.display,
+      role: cfg.role,
+      element: cfg.element,
+      stats,
+      imageBase: cfg.imageBase
+    };
+    saveAndShow(monster);
+  }
+
+  /******************************************************************
+   * SECTION: INIT & EVENTS
+   ******************************************************************/
+  (async function boot(){
+    renderTeam();
+    renderShards();
+
+    // Load model immediately; user can start camera after tap.
+    await loadModel();
+
+    $("#enableBtn").onclick = ()=> startCamera(state.facing);
+    $("#flipBtn").onclick = ()=> startCamera(state.facing==="environment" ? "user" : "environment");
+    $("#stopBtn").onclick = ()=> stopCamera();
+    $("#captureBtn").onclick = ()=> onCapture();
+    $("#clearTeamBtn").onclick = ()=>{ store.setTeam([]); renderTeam(); };
+    $("#clearAllBtn").onclick = ()=>{
+      if(confirm("This will clear monsters, team, favorite and shards on this device. Continue?")){
+        store.clearAll();
+        renderTeam(); renderShards();
+        $("#resultArea").textContent = "Data cleared.";
+      }
+    };
+  })();
+  </script>
+</body>
+</html>
   button.primary{background:var(--brand); border-color:transparent}
   button.ghost{background:transparent}
   button:disabled{opacity:.6; cursor:not-allowed}
@@ -592,3 +1084,4 @@ boot();
 </script>
 </body>
 </html>
+
