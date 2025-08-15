@@ -1,40 +1,816 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="utf-8" />
 <title>Monster Transform — PvPvE Beta</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- Pinned libs for Teachable Machine -->
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
 
-<!--
-FOLDERS REQUIRED (in your GitHub repo root):
+<style>
+  :root{
+    --bg:#0e0f10;--panel:#16181a;--soft:#1b1e22;--ink:#f5f7fa;--muted:#aab2bd;
+    --accent:#58b0ff;--ok:#7df59b;--warn:#d58cff;--bad:#ff7070;
+    --c-common:#9ea7ad;--c-uncommon:#63d297;--c-rare:#5599ff;--c-epic:#b066ff;--c-legend:#ffb74d;--c-mythic:#ff6fd8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+  header{padding:14px 16px;background:linear-gradient(90deg,#0c0d0f,#14161a);border-bottom:1px solid #222;display:flex;gap:12px;align-items:center}
+  header h1{margin:0;font-size:18px;letter-spacing:.3px}
+  #tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab-btn{background:#1a1d21;border:1px solid #2a2f36;border-radius:12px;padding:8px 12px;color:#ddd;cursor:pointer}
+  .tab-btn.active{border-color:#4aa9ff;box-shadow:0 0 0 2px #1a3d5f inset;color:#fff}
+  main{padding:14px;display:grid;gap:14px}
+  section.panel{background:var(--panel);border:1px solid #222;border-radius:16px;padding:14px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .col{flex:1 1 320px}
+  video,canvas,.preview{width:100%;max-height:46vh;background:#000;border-radius:12px;border:1px solid #333;object-fit:cover}
+  video{aspect-ratio:16/9}
+  .btn{background:#22262b;border:1px solid #333a43;color:#fff;padding:10px 12px;border-radius:10px;cursor:pointer}
+  .btn.primary{background:#0d47a1;border-color:#1565c0}
+  .btn.good{background:#1b5e20;border-color:#2e7d32}
+  .btn.warn{background:#7b1fa2;border-color:#8e24aa}
+  .btn.bad{background:#6e1111;border-color:#861717}
+  .btn.ghost{background:transparent;border:1px dashed #444}
+  .stack{display:flex;gap:8px;flex-wrap:wrap}
+  .statbar{height:12px;background:#2a2a2a;border:1px solid #333;border-radius:999px;overflow:hidden}
+  .statbar>.fill{height:100%}
+  .hp{background:#d32f2f}.stam{background:#43a047}
+  .center{display:flex;align-items:center;justify-content:center}
 
-/model_real/
-  - model.json
-  - metadata.json
-  - weights.bin
-/digital_images/
-  - dog.jpeg
-  - cat.jpeg
-  - squirrel.jpeg
-  - spider.jpeg
-  - fly.jpeg
-  - ladybug.jpeg
-  - boss_dragon.png           (placeholder)
-  - boss_kraken.png           (placeholder)
-  - miniboss_wolf.png         (placeholder)
-  - miniboss_golem.png        (placeholder)
+  /* Monster card */
+  .card{background:var(--soft);border:1px solid #2b2f35;border-radius:16px;padding:12px;display:grid;gap:10px;position:relative;overflow:hidden}
+  .card .title{display:flex;justify-content:space-between;align-items:center}
+  .rarity{font-weight:700}
+  .rarity.common{color:var(--c-common)}
+  .rarity.uncommon{color:var(--c-uncommon)}
+  .rarity.rare{color:var(--c-rare)}
+  .rarity.epic{color:var(--c-epic)}
+  .rarity.legendary{color:var(--c-legend)}
+  .rarity.mythic{color:var(--c-mythic)}
+  .glow{position:absolute;inset:-40%;filter:blur(40px);opacity:.20;pointer-events:none}
+  .glow.common{background:radial-gradient(var(--c-common),transparent)}
+  .glow.uncommon{background:radial-gradient(var(--c-uncommon),transparent)}
+  .glow.rare{background:radial-gradient(var(--c-rare),transparent)}
+  .glow.epic{background:radial-gradient(var(--c-epic),transparent)}
+  .glow.legendary{background:radial-gradient(var(--c-legend),transparent)}
+  .glow.mythic{background:radial-gradient(var(--c-mythic),transparent)}
+  .card img.art{width:100%;max-height:240px;object-fit:contain;border-radius:10px;border:1px solid #2e2e2e;background:#111}
 
-IMPORTANT (Mobile camera):
-- Serve over HTTPS (GitHub Pages is HTTPS by default).
-- iOS Safari: uses rear camera with {facingMode: "environment"} but may fall back.
-- If camera fails, you can still Upload Photo (bottom-right).
+  .inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .pill{font-size:12px;border:1px solid #333;background:#1f2327;padding:4px 8px;border-radius:999px}
+  .badge{font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid #333;background:#1f2327}
+  .badge.common{color:var(--c-common)} .badge.uncommon{color:var(--c-uncommon)} .badge.rare{color:var(--c-rare)}
+  .badge.epic{color:var(--c-epic)} .badge.legendary{color:var(--c-legend)} .badge.mythic{color:var(--c-mythic)}
 
-HOW TO ADD NEW MONSTERS:
-1) Put image into /digital_images/ as .png or .jpeg
-2) Add a Teachable Machine class with EXACT SAME lowercase name (e.g., "bear")
-3) Add an entry into MONSTER_DEX below with element + class type and base stats.
--->
+  #inventoryAnchor{position:fixed;right:12px;top:10px; width:28px;height:28px;border-radius:8px;border:1px solid #2b2f35;background:#1d2126;
+    display:flex;align-items:center;justify-content:center;z-index:10}
+  .fly{position:fixed;pointer-events:none;transition:transform .9s ease-in, opacity .9s ease-in}
 
+  .muted{color:var(--muted);font-size:13px}
+  .sep{height:1px;background:#242a31;margin:8px 0}
+  .error{color:#ff8a80}
+
+  /* Modal (victory/defeat/boss) */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal .box{background:#13161a;border:1px solid #2b2f35;border-radius:18px;padding:16px;max-width:820px;width:92%}
+  .modal h2{margin-top:0}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Monster Transform — PvPvE Beta</h1>
+  <div class="stack" id="tabs">
+    <button class="tab-btn active" data-tab="capture">Capture</button>
+    <button class="tab-btn" data-tab="inventory">Inventory</button>
+    <button class="tab-btn" data-tab="team">Team</button>
+    <button class="tab-btn" data-tab="battle">Battle</button>
+    <button class="tab-btn" data-tab="loot">Loot</button>
+    <button class="tab-btn" data-tab="mythics">Mythics</button>
+  </div>
+  <div id="inventoryAnchor" title="Inventory">🎒</div>
+</header>
+
+<main>
+  <!-- CAPTURE -->
+  <section class="panel" id="tab-capture">
+    <div class="row">
+      <div class="col">
+        <div class="stack">
+          <button class="btn primary" id="startCamBtn">▶ Start Camera</button>
+          <button class="btn" id="flipBtn">🔁 Flip</button>
+          <button class="btn ghost" id="uploadBtn">📁 Upload</button>
+        </div>
+        <p class="muted">iOS requires HTTPS (e.g., GitHub Pages). If camera fails, use Upload.</p>
+        <video id="webcam" playsinline autoplay muted disablepictureinpicture></video>
+        <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+        <div class="stack">
+          <button class="btn good" id="captureBtn">📸 Capture & Transform</button>
+        </div>
+        <canvas id="captureCanvas" style="display:none"></canvas>
+        <p id="capErr" class="error"></p>
+      </div>
+
+      <div class="col">
+        <h3>Result</h3>
+        <div id="result"></div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+    <div>
+      <span class="pill">Kill Count: <span id="killCount">0</span></span>
+      <span class="pill">Monsters Owned: <span id="ownedCount">0</span></span>
+      <span class="pill">Mythics Found: <span id="mythicCount">0</span></span>
+    </div>
+  </section>
+
+  <!-- INVENTORY -->
+  <section class="panel" id="tab-inventory" style="display:none">
+    <div class="stack">
+      <span class="pill">Capacity: <span id="invUsed">0</span>/<span id="invCap">50</span></span>
+      <button class="btn" id="expandInvBtn">+10 Slots (demo)</button>
+    </div>
+    <div class="sep"></div>
+    <div id="inventory" class="inv-grid"></div>
+  </section>
+
+  <!-- TEAM -->
+  <section class="panel" id="tab-team" style="display:none">
+    <p class="muted">Pick up to 3 monsters for your active team. Mark one as your “Best Pal” for bonuses.</p>
+    <div id="team" class="inv-grid"></div>
+  </section>
+
+  <!-- BATTLE -->
+  <section class="panel" id="tab-battle" style="display:none">
+    <div class="stack">
+      <button class="btn primary" id="fightWildBtn">⚔️ Fight Wild</button>
+      <button class="btn warn" id="fightMiniBtn">👹 Mini-Boss</button>
+      <button class="btn bad" id="fightBossBtn">💀 Boss</button>
+    </div>
+    <div class="row">
+      <div class="col">
+        <h3>Your Team</h3>
+        <div id="yourTeam" class="inv-grid"></div>
+      </div>
+      <div class="col">
+        <h3>Enemy</h3>
+        <div id="enemyCard"></div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div id="battleLog" style="white-space:pre-line;min-height:120px"></div>
+    <div id="battleLoot" class="stack"></div>
+  </section>
+
+  <!-- LOOT -->
+  <section class="panel" id="tab-loot" style="display:none">
+    <h3>Items</h3>
+    <div id="lootList" class="inv-grid"></div>
+  </section>
+
+  <!-- MYTHICS -->
+  <section class="panel" id="tab-mythics" style="display:none">
+    <h3>Mythic & Legendary Finds</h3>
+    <div id="mythicList" class="inv-grid"></div>
+  </section>
+</main>
+
+<!-- Victory/Defeat modal -->
+<div class="modal" id="resultModal" aria-hidden="true">
+  <div class="box">
+    <h2 id="modalTitle">Result</h2>
+    <div class="row">
+      <div class="col">
+        <h3>Your Team</h3>
+        <div id="modalTeam" class="inv-grid"></div>
+      </div>
+      <div class="col">
+        <h3>Enemy</h3>
+        <div id="modalEnemy"></div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div id="modalLoot" class="stack"></div>
+    <div class="sep"></div>
+    <div class="stack">
+      <button class="btn good" id="closeModal">Continue</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   0) CONSTANTS & TABLES
+   ========================= */
+const MODEL_URL = "model_real/";
+const CONFIDENCE_THRESHOLD = 0.70;
+const DUPLICATE_COOLDOWN_MINUTES = 60;
+const INVENTORY_CAP_START = 50;
+const TEAM_SIZE = 3;
+const EVOLVE_MAX = 5;
+const EVOLVE_LEVEL_GATES = [10,20,30,40,50];
+const BASE_XP_PER_WIN = 25;
+const UNKNOWN_NAME = "Wild Beast";
+
+// Rarity roll tables
+const RARITY = [
+  {key:'mythic',    pct:0.10,  mult:1.9},
+  {key:'legendary', pct:0.90,  mult:1.6},
+  {key:'epic',      pct:3.00,  mult:1.35},
+  {key:'rare',      pct:5.00,  mult:1.18},
+  {key:'uncommon',  pct:24.00, mult:1.08},
+  {key:'common',    pct:66.99, mult:1.00},
+];
+const BOSS_RARITY = [
+  {key:'mythic',    pct:0.30, mult:1.9},
+  {key:'legendary', pct:4.00, mult:1.6},
+  {key:'epic',      pct:12.0, mult:1.35},
+  {key:'rare',      pct:20.0, mult:1.18},
+  {key:'uncommon',  pct:28.0, mult:1.08},
+  {key:'common',    pct:35.7, mult:1.00},
+];
+const MINIBOSS_RARITY = [
+  {key:'mythic',    pct:0.15, mult:1.9},
+  {key:'legendary', pct:2.00, mult:1.6},
+  {key:'epic',      pct:8.0,  mult:1.35},
+  {key:'rare',      pct:16.0, mult:1.18},
+  {key:'uncommon',  pct:30.0, mult:1.08},
+  {key:'common',    pct:43.85, mult:1.00},
+];
+
+// Archetypes & elements
+const ARCHETYPES = {
+  guardian:  {hp:[80,110], atk:[18,28], def:[18,28], spd:[10,16], stamina:[60,90], element:'earth'},
+  rogue:     {hp:[60,80],  atk:[24,36], def:[10,18], spd:[20,30], stamina:[50,80], element:'shadow'},
+  tank:      {hp:[110,140],atk:[16,26], def:[22,34], spd:[8,12],  stamina:[70,100], element:'light'},
+  speedster: {hp:[55,75],  atk:[20,30], def:[10,16], spd:[28,38], stamina:[55,85], element:'nature'},
+  plague:    {hp:[65,85],  atk:[18,30], def:[12,18], spd:[24,32], stamina:[55,80], element:'air'},
+  trapper:   {hp:[70,95],  atk:[20,28], def:[14,24], spd:[16,22], stamina:[60,85], element:'poison'},
+  brawler:   {hp:[75,95],  atk:[22,32], def:[16,22], spd:[14,22], stamina:[60,85], element:'neutral'},
+};
+
+// 👉 Add more animals by extending this map and dropping art in digital_images/
+const CLASS_MAP = {
+  ladybug: {label:'Ladybug', archetype:'tank', art:'digital_images/ladybug.jpeg'},
+  squirrel:{label:'Squirrel', archetype:'speedster', art:'digital_images/squirrel.jpeg'},
+  dog:     {label:'Dog', archetype:'guardian', art:'digital_images/dog.jpeg'},
+  cat:     {label:'Cat', archetype:'rogue', art:'digital_images/cat.jpeg'},
+  spider:  {label:'Spider', archetype:'trapper', art:'digital_images/spider.jpeg'},
+  fly:     {label:'Fly', archetype:'plague', art:'digital_images/fly.jpeg'},
+};
+
+// Boss art placeholders
+const BOSS_ART = [
+  {key:'tiger',    name:'Tiger Overlord',    art:'boss_images/tiger_boss.jpeg'},
+  {key:'bear',     name:'Elder Bear',        art:'boss_images/bear_boss.jpeg'},
+  {key:'shark',    name:'Abyssal Shark',     art:'boss_images/shark_boss.jpeg'},
+  {key:'lion',     name:'Sun Pride King',    art:'boss_images/lion_boss.jpeg'},
+  {key:'snake',    name:'Venom Sovereign',   art:'boss_images/snake_boss.jpeg'},
+  {key:'alligator',name:'Bog Colossus',      art:'boss_images/alligator_boss.jpeg'},
+  {key:'pelican',  name:'Typhoon Carrier',   art:'boss_images/pelican_boss.jpeg'},
+];
+
+/* =========================
+   1) STATE & STORAGE
+   ========================= */
+const LS = {
+  inv:'ml_inventory_v3',
+  team:'ml_team_v3',
+  seen:'ml_seen_hashes_v3',
+  loot:'ml_loot_v3',
+  kills:'ml_kills_v3',
+  myth:'ml_mythic_v3',
+  cap:'ml_capacity_v3'
+};
+let model=null, webcamStream=null, currentFacing='environment';
+
+let inventory = loadLS(LS.inv, []);
+let team = loadLS(LS.team, []);
+let lootBag = loadLS(LS.loot, []);
+let kills = loadLS(LS.kills, {wild:0,miniboss:0,boss:0});
+let mythicLedger = loadLS(LS.myth, []);
+let invCapacity = loadLS(LS.cap, INVENTORY_CAP_START);
+
+function saveAll(){
+  localStorage.setItem(LS.inv, JSON.stringify(inventory));
+  localStorage.setItem(LS.team, JSON.stringify(team));
+  localStorage.setItem(LS.loot, JSON.stringify(lootBag));
+  localStorage.setItem(LS.kills, JSON.stringify(kills));
+  localStorage.setItem(LS.myth, JSON.stringify(mythicLedger));
+  localStorage.setItem(LS.cap, JSON.stringify(invCapacity));
+}
+function loadLS(k, d){ try{return JSON.parse(localStorage.getItem(k)) ?? d}catch{return d} }
+
+/* =========================
+   2) PRELOAD IMAGES
+   ========================= */
+[...Object.values(CLASS_MAP).map(x=>x.art), ...BOSS_ART.map(x=>x.art)]
+  .forEach(src=>{ const i=new Image(); i.src=src; });
+
+/* =========================
+   3) CAMERA + MODEL
+   ========================= */
+const webcamEl = document.getElementById('webcam');
+const startCamBtn = document.getElementById('startCamBtn');
+const flipBtn = document.getElementById('flipBtn');
+const captureBtn = document.getElementById('captureBtn');
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInput = document.getElementById('fileInput');
+const capErr = document.getElementById('capErr');
+const canvas = document.getElementById('captureCanvas');
+
+startCamBtn.addEventListener('click', startCamera);
+flipBtn.addEventListener('click', async ()=>{ currentFacing = currentFacing==='environment'?'user':'environment'; await startCamera(); });
+uploadBtn.addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', handleUpload);
+captureBtn.addEventListener('click', handleCapture);
+window.addEventListener('pageshow',()=>{ /* iOS back-forward cache fix */ if(document.querySelector('.tab-btn.active')?.dataset.tab==='capture') startCamera(); });
+window.addEventListener('visibilitychange',()=>{ if(document.hidden) stopCamera(); });
+
+async function ensureModel(){
+  if(model) return;
+  // quick check
+  for(const f of ["model.json","metadata.json","weights.bin"]){
+    try{ const r=await fetch(MODEL_URL+f,{cache:"no-store"}); console.log(r.ok?`✅ ${f}`:`❌ ${f} (${r.status})`) }catch(e){ console.warn("Fetch",f,e) }
+  }
+  model = await tmImage.load(MODEL_URL+"model.json", MODEL_URL+"metadata.json");
+}
+async function startCamera(){
+  capErr.textContent='';
+  try{
+    await ensureModel();
+    if(webcamStream){ webcamStream.getTracks().forEach(t=>t.stop()); }
+    const constraints = {
+      video:{ facingMode:{ideal:currentFacing}, width:{ideal:1280}, height:{ideal:720} }, audio:false
+    };
+    webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+    webcamEl.srcObject = webcamStream;
+    // ensure attributes for iOS
+    webcamEl.setAttribute('playsinline',''); webcamEl.setAttribute('autoplay',''); webcamEl.muted=true;
+    await webcamEl.play();
+  }catch(err){
+    capErr.textContent = `Camera error: ${err.name} — ${err.message}. Try Upload.`;
+    console.error(err);
+  }
+}
+function stopCamera(){ if(webcamStream){ webcamStream.getTracks().forEach(t=>t.stop()); webcamStream=null } }
+
+/* =========================
+   4) CAPTURE / UPLOAD / DUPLICATE
+   ========================= */
+async function handleCapture(){
+  if(!webcamStream){ capErr.textContent="No webcam stream available."; return; }
+  const w=webcamEl.videoWidth, h=webcamEl.videoHeight;
+  if(!w||!h){ capErr.textContent="Camera not ready yet."; return; }
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d'); ctx.drawImage(webcamEl,0,0,w,h);
+  await processCanvas(canvas);
+}
+async function handleUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  const img = new Image();
+  img.onload = async ()=>{ canvas.width=img.width; canvas.height=img.height; const c=canvas.getContext('2d'); c.drawImage(img,0,0); await processCanvas(canvas); };
+  img.src = URL.createObjectURL(file);
+}
+
+/* average hash duplicate guard (8x8) */
+function aHash(cnv){
+  const t=document.createElement('canvas'); t.width=8; t.height=8;
+  const x=t.getContext('2d'); x.drawImage(cnv,0,0,8,8);
+  const d=x.getImageData(0,0,8,8).data;
+  let gray=[],sum=0;
+  for(let i=0;i<64;i++){ const r=d[i*4],g=d[i*4+1],b=d[i*4+2]; const v=Math.round(0.299*r+0.587*g+0.114*b); gray.push(v); sum+=v; }
+  const avg=sum/64; let bits=''; for(const v of gray) bits += (v>avg?'1':'0'); return bits;
+}
+function duplicateRecently(hash){
+  const key=LS.seen; let store=loadLS(key,[]); const now=Date.now();
+  store=store.filter(e=> now-e.t < DUPLICATE_COOLDOWN_MINUTES*60*1000);
+  const seen=store.find(e=>e.h===hash);
+  if(seen) return true;
+  store.push({h:hash,t:now}); localStorage.setItem(key, JSON.stringify(store)); return false;
+}
+
+async function processCanvas(cnv){
+  await ensureModel();
+  const hash=aHash(cnv);
+  if(duplicateRecently(hash)){ showResultError("Duplicate photo detected recently. Try a new subject/angle."); return; }
+  let preds = await model.predict(cnv);
+  preds.sort((a,b)=>b.probability - a.probability);
+  const top = preds[0];
+  if(!top || top.probability < CONFIDENCE_THRESHOLD){
+    const m = createMonsterFromClass(null, 'wild', null);
+    renderResultCard(m, true);
+    return;
+  }
+  const cls=(top.className||'').toLowerCase().trim();
+  const m = createMonsterFromClass(cls, 'wild', top.probability);
+  renderResultCard(m, false);
+}
+
+/* =========================
+   5) MONSTER FACTORY
+   ========================= */
+function rollRarity(table=RARITY){
+  const r=Math.random()*100; let acc=0;
+  for(const row of table){ acc+=row.pct; if(r<=acc) return row.key }
+  return 'common';
+}
+function rngIn([a,b]){ return Math.floor(a + Math.random()*(b-a+1)) }
+function uid(){ return 'm_'+Math.random().toString(36).slice(2)+Date.now().toString(36) }
+function xpForNext(level){ return Math.floor(35 + Math.pow(level,1.6)*12) }
+
+function rarityMult(key){
+  const row = [...RARITY,...BOSS_RARITY,...MINIBOSS_RARITY].find(r=>r.key===key);
+  return row?row.mult:1;
+}
+
+function createMonsterFromClass(clsKey, origin='wild', conf=null, forcedRarity=null, bossMeta=null){
+  let label, archeKey, art;
+  if(!clsKey || !CLASS_MAP[clsKey]){
+    label=UNKNOWN_NAME; archeKey='brawler';
+    art = (Object.values(CLASS_MAP)[Math.floor(Math.random()*Object.values(CLASS_MAP).length)]).art;
+  }else{
+    ({label, art} = CLASS_MAP[clsKey]); archeKey = CLASS_MAP[clsKey].archetype;
+  }
+  const arch=ARCHETYPES[archeKey];
+  const rarity = forcedRarity || rollRarity(origin==='boss'?BOSS_RARITY:origin==='miniboss'?MINIBOSS_RARITY:RARITY);
+  const rMult = rarityMult(rarity);
+  const base = {
+    hp:rngIn(arch.hp), atk:rngIn(arch.atk), def:rngIn(arch.def), spd:rngIn(arch.spd), stamina:rngIn(arch.stamina)
+  };
+  for(const k of ['hp','atk','def','spd','stamina']) base[k]=Math.round(base[k]*rMult);
+  const m={
+    id:uid(),
+    name:label, cls:clsKey||'unknown', rarity, element:arch.element,
+    level:1, xp:0, evo:0, shards:0,
+    hp:base.hp, atk:base.atk, def:base.def, spd:base.spd, stamina:base.stamina,
+    curHp:base.hp, curStam:base.stamina,
+    art, origin, confidence:conf, bossMeta:bossMeta||null, favorite:false
+  };
+  return m;
+}
+
+/* =========================
+   6) RESULT CARD + ADD
+   ========================= */
+const resultEl=document.getElementById('result');
+function showResultError(msg){ resultEl.innerHTML=`<p class="error">${msg}</p>` }
+function glowDiv(r){ return `<div class="glow ${r}"></div>` }
+function pct(n,den){ return Math.max(0,Math.min(100,Math.round(n/den*100))) }
+function monsterCardHTML(m, withActions=true){
+  const bar=(label,val,max,cls)=>`
+    <div>
+      <div class="stack" style="justify-content:space-between"><span>${label}</span><span>${val}/${max}</span></div>
+      <div class="statbar"><div class="fill ${cls}" style="width:${pct(val,max)}%"></div></div>
+    </div>`;
+  return `
+  <div class="card">
+    ${glowDiv(m.rarity)}
+    <div class="title">
+      <div><strong>${m.name}</strong> <span class="badge ${m.rarity}">${m.rarity.toUpperCase()}</span> <span class="badge">${m.element}</span> ${m.favorite?"💚 Best Pal":""}</div>
+      <div>Lv ${m.level} (${m.evo}★)</div>
+    </div>
+    <img class="art" src="${m.art}" alt="${m.name}">
+    <div class="row">
+      <div class="col">${bar("HP",m.curHp,m.hp,"hp")}</div>
+      <div class="col">${bar("Stamina",m.curStam,m.stamina,"stam")}</div>
+    </div>
+    <div class="stack">
+      <span class="pill">ATK ${m.atk}</span>
+      <span class="pill">DEF ${m.def}</span>
+      <span class="pill">SPD ${m.spd}</span>
+      <span class="pill">XP ${m.xp}/${xpForNext(m.level)}</span>
+    </div>
+    ${withActions?`
+    <div class="stack">
+      <button class="btn good" data-act="addInv" data-id="${m.id}">➕ Add to Inventory</button>
+      <button class="btn" data-act="toTeam" data-id="${m.id}">⭐ Add to Team</button>
+    </div>`:''}
+  </div>`;
+}
+function renderResultCard(m, wasUnknown){
+  resultEl.innerHTML = monsterCardHTML(m,true);
+  resultEl.querySelectorAll('button').forEach(b=>b.addEventListener('click', e=>{
+    const act=e.target.getAttribute('data-act'); if(act==='addInv') addToInventory(m); if(act==='toTeam') addToTeam(m);
+  }));
+  if(wasUnknown) resultEl.insertAdjacentHTML('afterbegin', `<div class="muted">Low confidence — spawned a <em>${UNKNOWN_NAME}</em>.</div>`);
+}
+
+/* =========================
+   7) INVENTORY & TEAM
+   ========================= */
+const invEl=document.getElementById('inventory');
+const teamEl=document.getElementById('team');
+const invUsedEl=document.getElementById('invUsed');
+const invCapEl=document.getElementById('invCap');
+const expandInvBtn=document.getElementById('expandInvBtn');
+const ownedCountEl=document.getElementById('ownedCount');
+const mythicCountEl=document.getElementById('mythicCount');
+invCapEl.textContent = invCapacity;
+
+expandInvBtn.addEventListener('click', ()=>{ invCapacity+=10; invCapEl.textContent=invCapacity; saveAll(); renderAll(); });
+
+function addToInventory(m){
+  if(inventory.length>=invCapacity){ alert("Inventory full — break down or expand capacity."); return; }
+  inventory.push(m);
+  if(m.rarity==='mythic') mythicLedger.push({id:m.id,name:m.name,at:Date.now()});
+  saveAll(); renderAll(); flyToInventory();
+}
+function breakDown(id){
+  const ix=inventory.findIndex(x=>x.id===id); if(ix<0) return;
+  const m=inventory[ix];
+  const baseByRarity={common:1,uncommon:2,rare:4,epic:8,legendary:15,mythic:25};
+  const shards = baseByRarity[m.rarity] + Math.floor(m.level/5);
+  addLoot({type:'shard', key:m.cls||'unknown', name:`${(m.cls||'unknown').toUpperCase()} Shard`, qty:shards, rarity:m.rarity});
+  inventory.splice(ix,1); team=team.filter(t=>t!==id);
+  saveAll(); renderAll();
+}
+function toggleFavorite(id){
+  inventory.forEach(x=>x.favorite=false);
+  const m=inventory.find(x=>x.id===id); if(m){ m.favorite=true; saveAll(); renderAll(); }
+}
+function evolveWithShards(id){
+  const m=inventory.find(x=>x.id===id); if(!m) return;
+  if(m.evo>=EVOLVE_MAX){ alert("Max evolution reached"); return; }
+  const gate = EVOLVE_LEVEL_GATES[m.evo] || 999;
+  if(m.level<gate){ alert(`Requires level ${gate} to evolve to ${m.evo+1}★`); return; }
+  const cost = 5*(m.evo+1);
+  const have = getShardCount(m.cls||'unknown'); if(have<cost){ alert(`Need ${cost} shards, you have ${have}`); return; }
+  spendShards(m.cls||'unknown', cost);
+  m.evo++;
+  m.hp=Math.round(m.hp*1.10); m.atk=Math.round(m.atk*1.10); m.def=Math.round(m.def*1.10); m.spd=Math.round(m.spd*1.06); m.stamina=Math.round(m.stamina*1.08);
+  m.curHp=m.hp; m.curStam=m.stamina; saveAll(); renderAll();
+}
+function addToTeam(m){
+  if(!inventory.find(x=>x.id===m.id)) addToInventory(m);
+  if(team.includes(m.id)){ alert("Already on team"); return; }
+  if(team.length>=TEAM_SIZE){
+    if(confirm("Team full. Replace the last slot with this monster?")){ team.pop(); team.push(m.id); } else return;
+  }else team.push(m.id);
+  saveAll(); renderAll();
+}
+function removeFromTeam(id){ team=team.filter(x=>x!==id); saveAll(); renderAll(); }
+
+function renderInventory(){
+  invUsedEl.textContent = inventory.length; ownedCountEl.textContent = inventory.length; mythicCountEl.textContent = mythicLedger.length;
+  invEl.innerHTML = inventory.map(m=>`
+    <div class="card">
+      ${glowDiv(m.rarity)}
+      <div class="title"><div><strong>${m.name}</strong> <span class="badge ${m.rarity}">${m.rarity.toUpperCase()}</span> <span class="badge">${m.element}</span></div><div>Lv ${m.level} (${m.evo}★)</div></div>
+      <img class="art" src="${m.art}">
+      <div class="stack"><span class="pill">HP ${m.hp}</span><span class="pill">ATK ${m.atk}</span><span class="pill">DEF ${m.def}</span><span class="pill">SPD ${m.spd}</span></div>
+      <div class="stack">
+        <button class="btn" data-do="favorite" data-id="${m.id}">${m.favorite?"💚 Best Pal":"♡ Set Best Pal"}</button>
+        <button class="btn good" data-do="team" data-id="${m.id}">⭐ Team</button>
+      </div>
+      <div class="stack">
+        <button class="btn warn" data-do="evolve" data-id="${m.id}">⬆️ Evolve (shards)</button>
+        <button class="btn" data-do="break" data-id="${m.id}">♻ Break → shards</button>
+        <button class="btn ghost" data-do="delete" data-id="${m.id}">🗑 Remove</button>
+      </div>
+    </div>`).join('');
+  invEl.querySelectorAll('button').forEach(b=>{
+    const id=b.getAttribute('data-id'); const act=b.getAttribute('data-do');
+    b.onclick=()=>{
+      if(act==='favorite') toggleFavorite(id);
+      if(act==='team'){ const m=inventory.find(x=>x.id===id); if(m) addToTeam(m); }
+      if(act==='break') breakDown(id);
+      if(act==='delete'){ if(confirm("Remove from inventory? (No shards)")){ inventory=inventory.filter(x=>x.id!==id); team=team.filter(x=>x!==id); saveAll(); renderAll(); } }
+      if(act==='evolve') evolveWithShards(id);
+    };
+  });
+}
+function renderTeam(){
+  teamEl.innerHTML = team.map(id=>{
+    const m=inventory.find(x=>x.id===id); if(!m) return '';
+    return `<div class="card">
+      ${glowDiv(m.rarity)}
+      <div class="title"><strong>${m.name}</strong><span>Lv ${m.level} (${m.evo}★)</span></div>
+      <img class="art" src="${m.art}">
+      <div class="stack"><span class="pill">ATK ${m.atk}</span><span class="pill">DEF ${m.def}</span><span class="pill">SPD ${m.spd}</span></div>
+      <button class="btn" data-kick="${m.id}">Remove</button>
+    </div>`;
+  }).join('');
+  teamEl.querySelectorAll('button[data-kick]').forEach(b=>b.onclick=()=>removeFromTeam(b.getAttribute('data-kick')));
+}
+
+/* =========================
+   8) LOOT (STACKING)
+   ========================= */
+const lootListEl=document.getElementById('lootList');
+const battleLootEl=document.getElementById('battleLoot');
+const invAnchor=document.getElementById('inventoryAnchor');
+
+function addLoot(item){ // {type,key,name,qty,rarity}
+  const exist = lootBag.find(x=>x.type===item.type && x.key===item.key && x.rarity===item.rarity);
+  if(exist) exist.qty += item.qty; else lootBag.push({...item});
+  saveAll(); renderLoot();
+}
+function getShardCount(cls){ const row=lootBag.find(x=>x.type==='shard'&&x.key===cls); return row?row.qty:0; }
+function spendShards(cls,n){ const row=lootBag.find(x=>x.type==='shard'&&x.key===cls); if(!row) return false; row.qty-=n; if(row.qty<=0) lootBag=lootBag.filter(x=>x!==row); saveAll(); renderLoot(); return true; }
+
+function renderLoot(){
+  lootListEl.innerHTML = lootBag.map(it=>`
+    <div class="card">
+      <div class="title"><strong>${it.name}</strong> <span class="badge ${it.rarity||'common'}">${(it.rarity||'common').toUpperCase()}</span></div>
+      <div class="stack"><span class="pill">Type: ${it.type}</span><span class="pill">Qty: ${it.qty}</span></div>
+    </div>`).join('');
+}
+
+function flyToInventory(){
+  const srcEl = document.querySelector('#result img.art') || document.querySelector('#enemyCard img.art') || document.querySelector('#modalEnemy img.art');
+  if(!srcEl) return;
+  const b=srcEl.getBoundingClientRect(), t=invAnchor.getBoundingClientRect();
+  const ghost=srcEl.cloneNode(); ghost.className='fly'; ghost.style.left=b.left+'px'; ghost.style.top=b.top+'px'; ghost.style.width=b.width+'px'; ghost.style.height=b.height+'px'; document.body.appendChild(ghost);
+  requestAnimationFrame(()=>{ ghost.style.transform=`translate(${t.left-b.left}px, ${t.top-b.top}px) scale(0.1)`; ghost.style.opacity='0'; });
+  setTimeout(()=>ghost.remove(),950);
+}
+
+/* =========================
+   9) BATTLES + MODAL
+   ========================= */
+const yourTeamEl=document.getElementById('yourTeam');
+const enemyCardEl=document.getElementById('enemyCard');
+const battleLogEl=document.getElementById('battleLog');
+const fightWildBtn=document.getElementById('fightWildBtn');
+const fightMiniBtn=document.getElementById('fightMiniBtn');
+const fightBossBtn=document.getElementById('fightBossBtn');
+const killCountEl=document.getElementById('killCount');
+
+// Modal bits
+const resultModal=document.getElementById('resultModal');
+const modalTitle=document.getElementById('modalTitle');
+const modalTeam=document.getElementById('modalTeam');
+const modalEnemy=document.getElementById('modalEnemy');
+const modalLoot=document.getElementById('modalLoot');
+const closeModal=document.getElementById('closeModal');
+closeModal.onclick = ()=>{ resultModal.style.display='none'; };
+
+fightWildBtn.onclick=()=>startBattle('wild');
+fightMiniBtn.onclick=()=>startBattle('miniboss');
+fightBossBtn.onclick=()=>startBattle('boss');
+
+function renderTeamMini(){
+  yourTeamEl.innerHTML = team.map(id=>{
+    const m=inventory.find(x=>x.id===id); if(!m) return '';
+    return `<div class="card">
+      <div class="title"><strong>${m.name}</strong><span>Lv ${m.level}</span></div>
+      <img class="art" src="${m.art}">
+      <div class="stack"><span class="pill">${m.atk} ATK</span><span class="pill">${m.def} DEF</span><span class="pill">${m.spd} SPD</span></div>
+    </div>`;
+  }).join('');
+}
+function pickEnemy(tier){
+  if(tier==='wild'){
+    const keys=Object.keys(CLASS_MAP);
+    const k=keys[Math.floor(Math.random()*keys.length)];
+    return createMonsterFromClass(k,'wild',null,null,null);
+  }
+  const boss = BOSS_ART[Math.floor(Math.random()*BOSS_ART.length)];
+  const m = createMonsterFromClass(null, tier, null, tier==='boss'?'epic':'rare', {name:boss.name});
+  m.name=boss.name; m.art=boss.art;
+  if(tier==='miniboss'){ m.level=8+Math.floor(Math.random()*5); m.hp*=2.0; m.atk=Math.round(m.atk*1.4); m.def=Math.round(m.def*1.4); }
+  if(tier==='boss'){ m.level=15+Math.floor(Math.random()*6); m.hp*=3.0; m.atk=Math.round(m.atk*1.9); m.def=Math.round(m.def*1.8); }
+  return m;
+}
+function startBattle(tier){
+  if(team.length===0){ alert("Add at least one monster to your team."); return; }
+  renderTeamMini();
+  const enemy=pickEnemy(tier);
+  enemyCardEl.innerHTML = monsterCardHTML(enemy,false);
+  battleLogEl.textContent = "Battle started!\n";
+  const us = team.map(id=>structuredClone(inventory.find(x=>x.id===id))).filter(Boolean);
+  const fav = inventory.find(x=>x.favorite); if(fav){ const slot=us.find(x=>x.id===fav.id); if(slot){ slot.atk+=5; slot.hp+=10; slot.curHp=slot.hp; } }
+
+  let turn=0;
+  while(enemy.curHp>0 && us.some(x=>x.curHp>0) && turn<120){
+    turn++;
+    const attacker = us.filter(x=>x.curHp>0).sort((a,b)=>b.spd-a.spd)[0];
+    const dmg = Math.max(1, Math.round((attacker.atk*1.2) - (enemy.def*0.5)));
+    enemy.curHp -= dmg; battleLogEl.textContent += `${attacker.name} hits ${enemy.name} for ${dmg}\n`;
+    if(enemy.curHp<=0) break;
+    const targets = us.filter(x=>x.curHp>0);
+    const t = targets[Math.floor(Math.random()*targets.length)];
+    const edmg = Math.max(1, Math.round((enemy.atk*1.1) - (t.def*0.5)));
+    t.curHp -= edmg; battleLogEl.textContent += `${enemy.name} hits ${t.name} for ${edmg}\n`;
+  }
+
+  const victory = enemy.curHp<=0;
+  if(victory){
+    battleLogEl.textContent += `\n🎉 Victory!`;
+    addWinRewards(tier, us, enemy);
+    if(tier==='wild') kills.wild++; else if(tier==='miniboss') kills.miniboss++; else kills.boss++;
+    showBattleResultModal(true, us, enemy, tier);
+  }else{
+    battleLogEl.textContent += `\n💀 Defeat... Try leveling or evolving!`;
+    showBattleResultModal(false, us, enemy, tier);
+  }
+  localStorage.setItem(LS.kills, JSON.stringify(kills));
+  killCountEl.textContent = (kills.wild + kills.miniboss + kills.boss).toString();
+}
+function addWinRewards(tier, ourTeam, enemy){
+  const base = BASE_XP_PER_WIN * (tier==='boss'?5: tier==='miniboss'?3:1);
+  ourTeam.forEach(m=>{
+    const live=inventory.find(x=>x.id===m.id); if(!live) return;
+    live.xp += base;
+    while(live.xp>=xpForNext(live.level)){
+      live.xp -= xpForNext(live.level);
+      live.level++; live.hp+=5; live.atk+=2; live.def+=2; live.spd+=1; live.stamina+=3;
+      live.curHp=live.hp; live.curStam=live.stamina;
+      battleLogEl.textContent += `\n⬆️ ${live.name} reached Lv ${live.level}!`;
+    }
+  });
+
+  battleLootEl.innerHTML='';
+  const drops = (tier==='boss')?bossDrops(): (tier==='miniboss')?miniDrops():wildDrops();
+  for(const d of drops){
+    addLoot(d);
+    const tag=document.createElement('span'); tag.className=`badge ${d.rarity||'common'}`; tag.textContent=`+${d.qty} ${d.name}`;
+    battleLootEl.appendChild(tag);
+    flyToInventory();
+  }
+  saveAll(); renderAll();
+}
+function wildDrops(){
+  const out=[];
+  if(Math.random()<0.40){
+    const keys=Object.keys(CLASS_MAP); const k=keys[Math.floor(Math.random()*keys.length)];
+    out.push({type:'shard',key:k,name:`${k.toUpperCase()} Shard`,qty:1,rarity:'common'});
+  }
+  if(Math.random()<0.001){ out.push({type:'trinket',key:'wild_myth',name:'Wild Mythic Trinket',qty:1,rarity:'mythic'}) }
+  return out;
+}
+function miniDrops(){
+  const out=[];
+  const keys=Object.keys(CLASS_MAP); const k=keys[Math.floor(Math.random()*keys.length)];
+  out.push({type:'shard',key:k,name:`${k.toUpperCase()} Shard`,qty:2,rarity:'uncommon'});
+  if(Math.random()<0.05){ out.push({type:'part',key:'mini_fang',name:'Mini-Boss Fang',qty:1,rarity:'rare'}) }
+  if(Math.random()<0.0005){ out.push({type:'relic',key:'mini_relic',name:'Mini Relic',qty:1,rarity:'mythic'}) }
+  return out;
+}
+function bossDrops(){
+  const out=[];
+  const keys=Object.keys(CLASS_MAP); const k=keys[Math.floor(Math.random()*keys.length)];
+  out.push({type:'shard',key:k,name:`${k.toUpperCase()} Shard`,qty:5,rarity:'rare'});
+  if(Math.random()<0.20){ out.push({type:'part',key:'boss_horn',name:'Boss Horn',qty:1,rarity:'legendary'}) }
+  if(Math.random()<0.001){ out.push({type:'relic',key:'mythic_core',name:'Mythic Core',qty:1,rarity:'mythic'}) }
+  return out;
+}
+
+/* Modal renderer */
+function showBattleResultModal(victory, ourTeam, enemy, tier){
+  modalTitle.textContent = victory ? (tier==='boss'?'🏆 Boss Defeated!':'🎉 Victory!') : '💀 Defeat';
+  modalTeam.innerHTML = ourTeam.map(m=>`
+    <div class="card"><div class="title"><strong>${m.name}</strong><span>Lv ${m.level}</span></div><img class="art" src="${m.art}"></div>
+  `).join('');
+  modalEnemy.innerHTML = monsterCardHTML(enemy,false);
+  // Copy last battle loot chips
+  modalLoot.innerHTML = document.getElementById('battleLoot').innerHTML;
+  resultModal.style.display='flex';
+}
+
+/* =========================
+   10) TABS & MYTHICS
+   ========================= */
+const tabs=document.querySelectorAll('.tab-btn');
+const sections={
+  capture:document.getElementById('tab-capture'),
+  inventory:document.getElementById('tab-inventory'),
+  team:document.getElementById('tab-team'),
+  battle:document.getElementById('tab-battle'),
+  loot:document.getElementById('tab-loot'),
+  mythics:document.getElementById('tab-mythics'),
+};
+tabs.forEach(t=>t.onclick=()=>{
+  tabs.forEach(b=>b.classList.remove('active')); t.classList.add('active');
+  Object.values(sections).forEach(s=>s.style.display='none');
+  const tab=t.dataset.tab; sections[tab].style.display='';
+  if(tab==='capture'){ startCamera(); } else { stopCamera(); }
+  if(tab==='battle'){ renderTeamMini(); }
+});
+const mythicList=document.getElementById('mythicList');
+function renderMythics(){ mythicList.innerHTML = mythicLedger.map(m=>`
+  <div class="card"><div class="title"><strong>${m.name}</strong><span class="muted">${new Date(m.at).toLocaleString()}</span></div></div>
+`).join(''); }
+
+/* =========================
+   11) INITIAL RENDER
+   ========================= */
+const killCountEl=document.getElementById('killCount');
+function renderAll(){ renderInventory(); renderTeam(); renderLoot(); renderMythics(); killCountEl.textContent=(kills.wild+kills.miniboss+kills.boss).toString(); }
+renderAll();
+
+/* =========================
+   12) SMALL HELPERS
+   ========================= */
+function showToast(msg){ console.log(msg); }
+</script>
+</body>
+</html>
 <style>
   :root{
     --bg:#111; --panel:#1b1b1b; --soft:#222; --accent:#77e; --good:#4caf50; --warn:#ffc107; --bad:#e53935;
@@ -1474,4 +2250,5 @@ byId("btnBoss").addEventListener("click", ()=> runBattle(true));
 </script>
 </body>
 </html>
+
 
