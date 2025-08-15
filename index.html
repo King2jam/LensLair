@@ -29,149 +29,120 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image"></script>
-    <script>
-        const URL = "model_real/";
-        // Debug: Check if model files exist before loading
-(async () => {
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
+<script>
+  const URL = "model_real/";
+
+  // Debug: check that the 3 model files are actually being served
+  (async () => {
     const files = ["model.json", "metadata.json", "weights.bin"];
     for (const file of files) {
-        try {
-            const res = await fetch(`${URL}${file}`);
-            if (res.ok) {
-                console.log(`✅ Found: ${file}`);
-            } else {
-                console.error(`❌ Missing or not accessible: ${file}`);
-            }
-        } catch (err) {
-            console.error(`⚠️ Error fetching ${file}:`, err);
-        }
+      try {
+        const res = await fetch(`${URL}${file}`, { cache: "no-store" });
+        if (res.ok) console.log(`✅ Found: ${file}`);
+        else console.error(`❌ Missing or not accessible: ${file} (HTTP ${res.status})`);
+      } catch (err) {
+        console.error(`⚠️ Error fetching ${file}:`, err);
+      }
     }
-})();
+  })();
 
-        let model, webcamStream;
+  let model, webcamStream;
 
-        const monsterData = {
-            ladybug: { image: "digital_images/ladybug.png", type: "Tank" },
-            squirrel: { image: "digital_images/squirrel.png", type: "Rogue" },
-            dog: { image: "digital_images/dog.png", type: "Brawler" },
-            cat: { image: "digital_images/cat.png", type: "Assassin" },
-            spider: { image: "digital_images/spider.png", type: "Trapper" },
-            fly: { image: "digital_images/fly.png", type: "Scout" }
-        };
+  const monsterData = {
+    ladybug:  { image: "digital_images/ladybug.png.jpeg",  type: "Tank" },
+    squirrel: { image: "digital_images/squirrel.png.jpeg", type: "Rogue" },
+    dog:      { image: "digital_images/dog.png.jpeg",      type: "Brawler" },
+    cat:      { image: "digital_images/cat.png.jpeg",      type: "Assassin" },
+    spider:   { image: "digital_images/spider.png.jpeg",   type: "Trapper" },
+    fly:      { image: "digital_images/fly.png.jpeg",      type: "Scout" }
+  };
 
-        function logError(msg) {
-            const logBox = document.getElementById("errorLog");
-            logBox.style.display = "block";
-            logBox.innerHTML = `<strong>Error:</strong> ${msg}`;
-            console.error(msg);
-        }
+  function logError(msg) {
+    const logBox = document.getElementById("errorLog");
+    logBox.style.display = "block";
+    logBox.innerHTML = `<strong>Error:</strong> ${msg}`;
+    console.error(msg);
+  }
 
-        async function init() {
-            try {
-                model = await tmImage.load("model_real/model.json", "model_real/metadata.json");
-                console.log("✅ Model loaded successfully");
-            } catch (err) {
-                logError("Failed to load model. Check that model_real/ contains model.json, metadata.json, weights.bin.");
-                return;
-            }
-async function init() {
+  async function init() {
+    // 1) Load model
     try {
-        // Try rear camera first
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-        });
-        webcam.srcObject = stream;
+      model = await tmImage.load(`${URL}model.json`, `${URL}metadata.json`);
+      console.log("✅ Model loaded successfully");
     } catch (err) {
-        logError(`Rear camera could not start: ${err.name} — ${err.message}`);
-        console.error("Full rear camera error:", err);
-
-        try {
-            // Fallback to front camera
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "user" }
-            });
-            webcam.srcObject = stream;
-        } catch (err2) {
-            logError(`Front camera could not start: ${err2.name} — ${err2.message}`);
-            console.error("Full front camera error:", err2);
-            return;
-        }
+      logError("Failed to load model: " + err.message +
+               " — Check that model_real/ contains model.json, metadata.json, weights.bin.");
+      return;
     }
-}
-            try {
-    let constraints = { video: { facingMode: { ideal: "environment" } } }; 
-                
+
+    // 2) Start camera: try rear, fallback to front
     try {
-        // Try rear camera first
+      let constraints = { video: { facingMode: { ideal: "environment" } } };
+      try {
         webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log("✅ Rear camera started successfully");
-    } catch (rearErr) {
-        console.warn("Rear camera failed, trying front camera...");
-        // If rear camera fails, try front camera
+      } catch (rearErr) {
+        console.warn("Rear camera failed, trying front camera...", rearErr);
         constraints = { video: { facingMode: "user" } };
         webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log("✅ Front camera started successfully");
+      }
+      document.getElementById("webcam").srcObject = webcamStream;
+    } catch (err) {
+      logError(`Camera could not start: ${err.name} — ${err.message}`);
+      console.error("Full camera error:", err);
+      return;
     }
+  }
 
-    document.getElementById("webcam").srcObject = webcamStream;
+  document.getElementById("captureBtn").addEventListener("click", async () => {
+    if (!webcamStream) {
+      logError("No webcam stream available.");
+      return;
+    }
+    const videoElement = document.getElementById("webcam");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = videoElement.videoWidth;
+    canvas.height = videoElement.videoHeight;
+    ctx.drawImage(videoElement, 0, 0);
 
-} catch (err) {
-    logError(`Camera could not start: ${err.name} — ${err.message}`);
-    console.error("Full camera error:", err);
-    return;
-}
-        }
+    // Stop camera to “freeze” the capture
+    webcamStream.getTracks().forEach(track => track.stop());
 
-        document.getElementById("captureBtn").addEventListener("click", async () => {
-            if (!webcamStream) {
-                logError("No webcam stream available.");
-                return;
-            }
-            const videoElement = document.getElementById("webcam");
-            const canvas = document.getElementById("canvas");
-            const ctx = canvas.getContext("2d");
-            canvas.width = videoElement.videoWidth;
-            canvas.height = videoElement.videoHeight;
-            ctx.drawImage(videoElement, 0, 0);
+    try {
+      const prediction = await model.predict(canvas);
+      prediction.sort((a, b) => b.probability - a.probability);
+      const top = prediction[0]?.className?.toLowerCase();
+      if (top && monsterData[top]) {
+        showMonster(top);
+      } else {
+        document.getElementById("result").innerHTML =
+          `<p>No matching monster found for "${top ?? "unknown"}".</p>`;
+      }
+    } catch (err) {
+      logError("Prediction failed: " + err.message);
+      console.error("Prediction error:", err);
+    }
+  });
 
-            webcamStream.getTracks().forEach(track => track.stop());
+  function showMonster(name) {
+    const monster = monsterData[name];
+    const health = Math.floor(Math.random() * 51) + 50;
+    const attack = Math.floor(Math.random() * 51) + 20;
+    document.getElementById("result").innerHTML = `
+      <div class="monster-card">
+        <h2>${name.toUpperCase()} — ${monster.type}</h2>
+        <img src="${monster.image}" alt="${name}">
+        <div class="stats">
+          <p><strong>Health:</strong> ${health}</p>
+          <p><strong>Attack:</strong> ${attack}</p>
+        </div>
+      </div>
+    `;
+  }
 
-            try {
-                const prediction = await model.predict(canvas);
-                prediction.sort((a, b) => b.probability - a.probability);
-                const top = prediction[0].className.toLowerCase();
-
-                if (monsterData[top]) {
-                    showMonster(top);
-                } else {
-                    document.getElementById("result").innerHTML = `<p>No matching monster found for "${top}".</p>`;
-                }
-            } catch (err) {
-                logError("Prediction failed. Model might not match your image input size.");
-            }
-        });
-
-        function showMonster(name) {
-            const monster = monsterData[name];
-            const health = Math.floor(Math.random() * 51) + 50;
-            const attack = Math.floor(Math.random() * 51) + 20;
-            document.getElementById("result").innerHTML = `
-                <div class="monster-card">
-                    <h2>${name.toUpperCase()} — ${monster.type}</h2>
-                    <img src="${monster.image}" alt="${name}">
-                    <div class="stats">
-                        <p><strong>Health:</strong> ${health}</p>
-                        <p><strong>Attack:</strong> ${attack}</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        init();
-    </script>
-</body>
-</html>
-
-
-
-
+  init();
+</script>
