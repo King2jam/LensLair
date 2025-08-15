@@ -1,40 +1,1013 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Monster Transform — PvPvE Beta</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-<meta name="apple-mobile-web-app-capable" content="yes">
-<!-- Pinned libs for Teachable Machine -->
-<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
-
+<meta charset="UTF-8" />
+<title>Monster Transform — Offline PVPVE Beta</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
   :root{
-    --bg:#0e0f10;--panel:#16181a;--soft:#1b1e22;--ink:#f5f7fa;--muted:#aab2bd;
-    --accent:#58b0ff;--ok:#7df59b;--warn:#d58cff;--bad:#ff7070;
-    --c-common:#9ea7ad;--c-uncommon:#63d297;--c-rare:#5599ff;--c-epic:#b066ff;--c-legend:#ffb74d;--c-mythic:#ff6fd8;
+    --bg:#0f1220; --panel:#161a2e; --panel-2:#1e2442; --text:#e8ecff; --muted:#a9b2d0;
+    --accent:#7aa2ff; --good:#30cf7b; --bad:#ff5a67; --warn:#ffb020;
+    --common:#9aa3b2; --uncommon:#4cd964; --rare:#6c8cff; --boss:#ff6f61; --mythic:#ff4dff;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
-  header{padding:14px 16px;background:linear-gradient(90deg,#0c0d0f,#14161a);border-bottom:1px solid #222;display:flex;gap:12px;align-items:center}
-  header h1{margin:0;font-size:18px;letter-spacing:.3px}
-  #tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .tab-btn{background:#1a1d21;border:1px solid #2a2f36;border-radius:12px;padding:8px 12px;color:#ddd;cursor:pointer}
-  .tab-btn.active{border-color:#4aa9ff;box-shadow:0 0 0 2px #1a3d5f inset;color:#fff}
-  main{padding:14px;display:grid;gap:14px}
-  section.panel{background:var(--panel);border:1px solid #222;border-radius:16px;padding:14px}
-  .row{display:flex;gap:14px;flex-wrap:wrap}
-  .col{flex:1 1 320px}
-  video,canvas,.preview{width:100%;max-height:46vh;background:#000;border-radius:12px;border:1px solid #333;object-fit:cover}
-  video{aspect-ratio:16/9}
-  .btn{background:#22262b;border:1px solid #333a43;color:#fff;padding:10px 12px;border-radius:10px;cursor:pointer}
-  .btn.primary{background:#0d47a1;border-color:#1565c0}
-  .btn.good{background:#1b5e20;border-color:#2e7d32}
-  .btn.warn{background:#7b1fa2;border-color:#8e24aa}
-  .btn.bad{background:#6e1111;border-color:#861717}
-  .btn.ghost{background:transparent;border:1px dashed #444}
-  .stack{display:flex;gap:8px;flex-wrap:wrap}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:linear-gradient(180deg,#0c1020 0%,#0e1226 100%);color:var(--text)}
+  header{padding:14px 16px;background:#0a0e1d;border-bottom:1px solid #242a48;position:sticky;top:0;z-index:5}
+  h1{margin:0;font-size:18px;letter-spacing:.4px}
+  #tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .tab{padding:8px 12px;border-radius:999px;background:var(--panel);color:var(--text);cursor:pointer;border:1px solid #263058}
+  .tab.active{background:var(--accent);border-color:transparent;color:#06122e;font-weight:700}
+  main{padding:16px;max-width:1100px;margin:0 auto}
+  .grid{display:grid;gap:16px}
+  .grid-2{grid-template-columns:1fr}
+  @media(min-width:880px){.grid-2{grid-template-columns:1.2fr .8fr}}
+  .card{background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);border:1px solid #2a325e;border-radius:18px;padding:14px;box-shadow:var(--shadow)}
+  .card h2{margin:.1rem 0 .6rem 0;font-size:18px}
+  .muted{color:var(--muted);font-size:14px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button, .btn{background:#263058;color:#e4ebff;border:1px solid #34407a;border-radius:12px;padding:10px 12px;font-weight:600;cursor:pointer}
+  button.primary{background:var(--accent);color:#06122e;border-color:transparent}
+  button.ghost{background:transparent;border-color:#34407a}
+  button:disabled{opacity:.55;cursor:not-allowed}
+  input[type="file"]{display:none}
+  label.file{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px dashed #3a457f;background:rgba(122,162,255,.06);cursor:pointer}
+  video, canvas, img.preview{width:100%;max-height:52vh;object-fit:contain;border-radius:14px;border:1px solid #2b3566;background:#0b0f23}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .bar{height:14px;background:#0b0f1a;border:1px solid #2b3566;border-radius:999px;overflow:hidden}
+  .bar>span{display:block;height:100%}
+  .hp{background:linear-gradient(90deg,#ff6d6d,#ff2e4f)}
+  .stam{background:linear-gradient(90deg,#4cf098,#0ecf66)}
+  .glow{box-shadow:0 0 0 2px rgba(255,255,255,.05), 0 0 30px rgba(122,162,255,.25) inset}
+  .pill{padding:6px 10px;border-radius:999px;border:1px solid #2f386d;background:#1a1f39;font-size:12px}
+  .rarity-common{color:#c7ceda}
+  .rarity-uncommon{color:var(--uncommon)}
+  .rarity-rare{color:var(--rare)}
+  .rarity-boss{color:var(--boss)}
+  .rarity-mythic{color:var(--mythic)}
+  .list{display:grid;gap:10px}
+  .item{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid #2a325e;border-radius:12px;background:#161b33}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace}
+  .hidden{display:none}
+  .fly{position:fixed;pointer-events:none;z-index:99;transition:transform .8s ease, opacity .8s ease}
+  .codex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .codex-card{background:#141a34;border:1px solid #2b3566;border-radius:14px;padding:8px;text-align:center}
+  .codex-card img{width:100%;height:110px;object-fit:contain}
+  .silhouette{filter:brightness(0) contrast(200%)}
+  .footer{opacity:.7;font-size:12px;margin-top:8px}
+  /* Rarity outline glow on monster card border */
+  .outline-common{box-shadow:0 0 0 2px var(--common) inset}
+  .outline-uncommon{box-shadow:0 0 0 2px var(--uncommon) inset}
+  .outline-rare{box-shadow:0 0 0 2px var(--rare) inset}
+  .outline-boss{box-shadow:0 0 0 2px var(--boss) inset}
+  .outline-mythic{box-shadow:0 0 0 2px var(--mythic) inset}
+</style>
+</head>
+<body>
+<header>
+  <h1>Monster Transform — PVPVE Beta (Offline-Ready)</h1>
+  <div id="tabs">
+    <div class="tab active" data-tab="capture">Capture</div>
+    <div class="tab" data-tab="battles">Battles</div>
+    <div class="tab" data-tab="inventory">Inventory</div>
+    <div class="tab" data-tab="team">Team</div>
+    <div class="tab" data-tab="codex">Codex</div>
+    <div class="tab" data-tab="mythic">Mythics</div>
+    <div class="tab" data-tab="settings">Settings</div>
+  </div>
+</header>
+
+<main>
+  <!-- CAPTURE -->
+  <section id="capture" class="grid grid-2">
+    <div class="card">
+      <h2>Camera</h2>
+      <p class="muted">Aim at a supported animal. High confidence is required to prevent abuse. If camera won’t start, try toggling front/rear or use Upload.</p>
+      <div class="row" style="gap:6px;margin-bottom:8px">
+        <button id="btnStart" class="primary">Start Camera</button>
+        <button id="btnFlip" class="ghost">Flip Front/Rear</button>
+        <label class="file">
+          <input id="fileInput" type="file" accept="image/*" />
+          📁 Upload Photo
+        </label>
+        <span class="muted" id="camStatus"></span>
+      </div>
+      <video id="webcam" autoplay playsinline muted class="glow"></video>
+      <canvas id="frame" class="hidden"></canvas>
+      <div class="row" style="margin-top:10px">
+        <button id="btnCapture" disabled>📸 Capture</button>
+        <button id="btnRetake" class="ghost" disabled>Retake</button>
+      </div>
+      <div id="errorBox" class="muted" style="color:#ff98a8;margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Result</h2>
+      <div id="resultBox" class="muted">No capture yet.</div>
+    </div>
+  </section>
+
+  <!-- BATTLES -->
+  <section id="battles" class="hidden">
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>Quick Battle</h2>
+        <p class="muted">Fight a random enemy. Mini-bosses and Bosses appear sometimes. Loot scales with difficulty. </p>
+        <div class="row">
+          <button id="btnWild">Wild Battle</button>
+          <button id="btnMini">Mini-Boss</button>
+          <button id="btnBoss">Boss</button>
+        </div>
+        <div id="battleView" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <h2>Kill Counters</h2>
+        <div id="killCounts" class="list"></div>
+        <div class="footer">Counters help track future achievements.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INVENTORY -->
+  <section id="inventory" class="hidden">
+    <div class="card">
+      <h2>Shards & Items</h2>
+      <div id="invList" class="list"></div>
+      <div class="footer">Duplicates stack. Capacity is soft-limited; you’ll be prompted when full to break down extras.</div>
+    </div>
+  </section>
+
+  <!-- TEAM -->
+  <section id="team" class="hidden">
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>Your Team (3)</h2>
+        <div id="teamSlots" class="list"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="btnSaveTeam" class="primary">Save Team</button>
+          <button id="btnClearTeam" class="ghost">Clear Team</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>All Monsters</h2>
+        <div id="monsterList" class="list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODEX -->
+  <section id="codex" class="hidden">
+    <div class="card">
+      <h2>Monster Codex</h2>
+      <p class="muted">Silhouette means you haven’t captured it yet.</p>
+      <div id="codexGrid" class="codex-grid"></div>
+    </div>
+  </section>
+
+  <!-- MYTHICS -->
+  <section id="mythic" class="hidden">
+    <div class="card">
+      <h2>Mythic Items</h2>
+      <div id="mythicList" class="list"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settings" class="hidden">
+    <div class="grid grid-2">
+      <div class="card">
+        <h2>Capture Rules</h2>
+        <div class="row">
+          <label class="pill">Confidence: <span id="confVal" class="mono"></span></label>
+          <input id="confRange" type="range" min="0.5" max="0.98" step="0.01" />
+        </div>
+        <p class="muted">We block low-confidence or “none/unknown” predictions to prevent spamming with walls/humans. Train a “none” class in Teachable Machine for even tighter control.</p>
+      </div>
+      <div class="card">
+        <h2>Data</h2>
+        <div class="row">
+          <button id="btnExport" class="ghost">Export Save</button>
+          <button id="btnImport" class="ghost">Import Save</button>
+          <button id="btnReset" style="background:#3a1b2a;border-color:#5a2942">Hard Reset</button>
+        </div>
+        <input id="importFile" type="file" accept="application/json" class="hidden" />
+        <p class="footer">Offline caching is enabled. First visit needs internet to cache model & images.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
+<script>
+/* =========================================================
+   CONFIG + “WHERE DO I PUT MY FILES?”
+   ---------------------------------------------------------
+   1) Teachable Machine model goes in: /model_real/
+      - model_real/model.json
+      - model_real/metadata.json
+      - model_real/weights.bin
+   2) Your digital art goes in: /digital_images/
+      REQUIRED filenames for the current starter set:
+      - ladybug.jpeg, squirrel.jpeg, dog.jpeg, cat.jpeg, spider.jpeg, fly.jpeg
+      Add more later (e.g. bird.jpeg) and register it in MONSTER_LIBRARY below.
+
+   Tweakable knobs:
+========================================================= */
+const PATHS = {
+  MODEL_DIR: "model_real/",
+  DIGITAL_DIR: "digital_images/"
+};
+
+// Confidence threshold to accept the Teachable Machine prediction.
+// Raise to reduce false positives. We also reject "none"/"unknown" labels.
+let CONFIDENCE_THRESHOLD = 0.88;
+
+// Rarity chances for captures (monster rarity, not item rarity)
+const RARITY_TABLE = [
+  { key:"common",   pct: 0.74 },
+  { key:"uncommon", pct: 0.25 },
+  { key:"rare",     pct: 0.01 }
+];
+
+// Loot tables (wild/mini/boss). Mythic item chances included here.
+const LOOT_TABLES = {
+  wild: [
+    { id:"shard_common",   name:"Common Shard",   qty:[1,2],  pct:0.60 },
+    { id:"potion_small",   name:"Small Potion",   qty:[1,1],  pct:0.25 },
+    { id:"mythic_dust",    name:"Mythic Dust",    qty:[1,1],  pct:0.001 }, // 0.1%
+  ],
+  mini: [
+    { id:"shard_uncommon", name:"Uncommon Shard", qty:[1,3],  pct:0.55 },
+    { id:"potion_medium",  name:"Medium Potion",  qty:[1,2],  pct:0.35 },
+    { id:"boss_tooth",     name:"Boss Tooth",     qty:[1,1],  pct:0.05 },
+    { id:"mythic_dust",    name:"Mythic Dust",    qty:[1,1],  pct:0.0005 }, // 0.05%
+  ],
+  boss: [
+    { id:"shard_rare",     name:"Rare Shard",     qty:[2,4],  pct:0.70 },
+    { id:"potion_large",   name:"Large Potion",   qty:[1,2],  pct:0.35 },
+    { id:"boss_horn",      name:"Boss Horn",      qty:[1,1],  pct:0.20 }, // unique
+    { id:"mythic_core",    name:"Mythic Core",    qty:[1,1],  pct:0.0002 } // 0.02%
+  ]
+};
+
+// Base stat templates per element/class combo (simple, expandable)
+const BASES = {
+  // element: { hp, atk, def, spd, stam }
+  earth:   { hp: 80, atk:50, def:60, spd:40, stam:60 },
+  nature:  { hp: 75, atk:45, def:55, spd:65, stam:70 },
+  shadow:  { hp: 60, atk:70, def:40, spd:85, stam:55 },
+  light:   { hp: 85, atk:50, def:70, spd:35, stam:65 },
+  poison:  { hp: 70, atk:55, def:45, spd:60, stam:65 },
+  air:     { hp: 55, atk:45, def:40, spd:95, stam:80 }
+};
+const CLASS_MOD = {
+  Guardian: { hp:+12, def:+10, atk:+0,  spd:-5, stam:+5 },
+  Tank:     { hp:+18, def:+8,  atk:-4,  spd:-8, stam:+6 },
+  Brawler:  { hp:+6,  def:+2,  atk:+12, spd:+0, stam:+2 },
+  Assassin: { hp:-10, def:-5,  atk:+16, spd:+12,stam:-4 },
+  Trapper:  { hp:+0,  def:+4,  atk:+6,  spd:+2, stam:+6 },
+  Scout:    { hp:-6,  def:-4,  atk:+0,  spd:+16,stam:+10 }
+};
+const RARITY_MOD = {
+  common:   { hp:+0,  atk:+0,  def:+0,  spd:+0,  stam:+0 },
+  uncommon: { hp:+6,  atk:+5,  def:+5,  spd:+5,  stam:+6 },
+  rare:     { hp:+12, atk:+10, def:+10, spd:+10, stam:+12 },
+  boss:     { hp:+30, atk:+24, def:+24, spd:+10, stam:+20 }
+};
+
+// Library: where you **add new monsters** (one line per animal).
+// key = TeachableMachine className (lowercase), img = digital_images/*.jpeg
+// element & mclass drive stats/theme. codexName is the pretty name.
+const MONSTER_LIBRARY = {
+  ladybug: { img:"ladybug.jpeg",  element:"light",  mclass:"Tank",     codexName:"Guardian Ladybug" },
+  squirrel:{ img:"squirrel.jpeg", element:"nature", mclass:"Tank",     codexName:"Barkshield Squirrel" },
+  dog:     { img:"dog.jpeg",      element:"earth",  mclass:"Brawler",  codexName:"Ward Hound" },
+  cat:     { img:"cat.jpeg",      element:"shadow", mclass:"Assassin", codexName:"Night Prowler" },
+  spider:  { img:"spider.jpeg",   element:"poison", mclass:"Trapper",  codexName:"Weave Widow" },
+  fly:     { img:"fly.jpeg",      element:"air",    mclass:"Scout",    codexName:"Pest Gale" }
+};
+// Unknown fallback (when label is “none/unknown”), still a valid enemy for battles.
+const WILD_UNKNOWN = { img:null, element:"nature", mclass:"Brawler", codexName:"Wild Beast" };
+
+// Team limits and evolve gates
+const TEAM_SIZE = 3;
+const EVO_MAX = 5;
+const EVO_GATES = [10, 20, 30, 40, 50]; // level required for each evolution tier
+
+// ================== STATE (localStorage) ==================
+const store = {
+  get(){ try{return JSON.parse(localStorage.getItem("mt_save")||"{}")}catch{ return {} } },
+  set(obj){ localStorage.setItem("mt_save", JSON.stringify(obj)); },
+  reset(){ localStorage.removeItem("mt_save"); }
+};
+let state = {
+  monsters: [],     // array of monster objects
+  inventory: {},    // { itemId: qty }
+  mythics: {},      // { itemId: qty } (also mirrored in inventory)
+  team: [],         // array of monster ids (TEAM_SIZE)
+  codex: {},        // discovered by key (className)
+  kills: { wild:0, mini:0, boss:0 },
+  settings: { conf: CONFIDENCE_THRESHOLD }
+};
+function loadState(){
+  const s = store.get();
+  state = Object.assign(state, s);
+  if(state.settings?.conf){ CONFIDENCE_THRESHOLD = state.settings.conf; }
+}
+function saveState(){
+  state.settings.conf = CONFIDENCE_THRESHOLD;
+  store.set(state);
+}
+
+// ================== UTILS ==================
+function uid(){ return "m-"+Math.random().toString(36).slice(2)+Date.now().toString(36); }
+function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+function roll(p){ return Math.random() < p; }
+function pickRarity(){
+  let r=Math.random(), acc=0;
+  for(const t of RARITY_TABLE){ acc+=t.pct; if(r<acc) return t.key; }
+  return "common";
+}
+function rarityClass(r){ return "rarity-"+r; }
+function outlineClass(r){
+  return r==="common"?"outline-common":
+         r==="uncommon"?"outline-uncommon":
+         r==="rare"?"outline-rare":
+         r==="boss"?"outline-boss":"outline-mythic";
+}
+function fmtPct(p){ return Math.round(p*1000)/10+"%"; }
+function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function between([a,b]){ return randInt(a,b); }
+function sumLoot(table){
+  const drops=[];
+  for(const d of table){
+    if(roll(d.pct)){
+      const qty = between(d.qty);
+      drops.push({id:d.id, name:d.name, qty});
+    }
+  }
+  return drops;
+}
+async function sha256FromCanvas(canvas){
+  const blob = await new Promise(r=>canvas.toBlob(r,"image/jpeg",0.92));
+  const buf = await blob.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buf);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// ================== CAMERA / MODEL ==================
+let model=null, metadata=null, stream=null, useRear=true;
+
+async function ensureModel(){
+  if(model) return;
+  // quick presence check (helps debug 404)
+  for(const f of ["model.json","metadata.json","weights.bin"]){
+    try{
+      const res = await fetch(PATHS.MODEL_DIR+f,{cache:"no-store"});
+      if(!res.ok){ throw new Error(`Model file missing: ${f} (HTTP ${res.status})`); }
+    }catch(e){ throw new Error(`Failed to fetch ${f}: ${e.message}`); }
+  }
+  model = await tmImage.load(PATHS.MODEL_DIR+"model.json", PATHS.MODEL_DIR+"metadata.json");
+  // @ts-ignore
+  metadata = model?.getTotalClasses ? {totalClasses:model.getTotalClasses()} : {};
+}
+
+async function startCamera(){
+  stopCamera();
+  const constraints = {
+    video: {
+      facingMode: useRear ? {ideal:"environment"} : "user",
+      width:{ideal:1280}, height:{ideal:720}
+    },
+    audio:false
+  };
+  try{
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const v = $("#webcam");
+    v.srcObject = stream;
+    $("#camStatus").textContent = useRear?"Rear camera":"Front camera";
+    $("#btnCapture").disabled = false;
+    $("#btnRetake").disabled = true;
+    $("#errorBox").textContent = "";
+  }catch(err){
+    $("#errorBox").textContent = `Camera error: ${err.name} — ${err.message}`;
+    $("#btnCapture").disabled = true;
+  }
+}
+function stopCamera(){
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+}
+function $ (s){ return document.querySelector(s); }
+function el(tag, attrs={}, children=[]){
+  const n = document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v])=>{
+    if(k==="class") n.className=v;
+    else if(k==="html") n.innerHTML=v;
+    else n.setAttribute(k,v);
+  });
+  children.forEach(c=>n.appendChild(c));
+  return n;
+}
+
+// ================== STATS & MONSTER CREATION ==================
+function computeStats(element, mclass, rarity, level=1){
+  const base = {...BASES[element]};
+  const modc = CLASS_MOD[mclass]||{hp:0,atk:0,def:0,spd:0,stam:0};
+  const modr = RARITY_MOD[rarity]||{hp:0,atk:0,def:0,spd:0,stam:0};
+  let hp=base.hp+modc.hp+modr.hp, atk=base.atk+modc.atk+modr.atk, def=base.def+modc.def+modr.def, spd=base.spd+modc.spd+modr.spd, stam=base.stam+modc.stam+modr.stam;
+  // scale with level (simple: +2% per level)
+  const mult = 1+(Math.max(level-1,0)*0.02);
+  return {
+    hp: Math.round(hp*mult),
+    atk: Math.round(atk*mult),
+    def: Math.round(def*mult),
+    spd: Math.round(spd*mult),
+    stam: Math.round(stam*mult)
+  };
+}
+function makeMonsterFromLabel(label, conf, imgHash){
+  const key = (label||"").toLowerCase();
+  const lib = MONSTER_LIBRARY[key];
+  if(!lib) return null;
+  const rarity = pickRarity();
+  const level = 1;
+  const evo = 0;
+  const stats = computeStats(lib.element, lib.mclass, rarity, level);
+  const id = uid();
+  const mon = {
+    id, key, name: lib.codexName, element: lib.element, mclass: lib.mclass,
+    rarity, level, evo, exp:0, stats, currentHP:stats.hp, stam:stats.stam,
+    img: PATHS.DIGITAL_DIR+lib.img, hash: imgHash, seen: Date.now()
+  };
+  return mon;
+}
+function renderBars(hp, hpMax, stam, stamMax){
+  const hpPct = clamp(Math.round(hp/hpMax*100),0,100);
+  const stPct = clamp(Math.round(stam/stamMax*100),0,100);
+  return `
+    <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:4px"><span>HP</span><span class="mono">${hp}/${hpMax}</span></div>
+      <div class="bar"><span class="hp" style="width:${hpPct}%"></span></div>
+    </div>
+    <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:4px"><span>Stamina</span><span class="mono">${stPct}/${stamMax}</span></div>
+      <div class="bar"><span class="stam" style="width:${stPct}%"></span></div>
+    </div>
+  `;
+}
+function monsterCard(mon){
+  const rclass = rarityClass(mon.rarity);
+  const oclass = outlineClass(mon.rarity);
+  return `
+    <div class="card ${oclass}">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="${rclass}" style="font-weight:700">${mon.name}</div>
+          <div class="muted">${mon.element.toUpperCase()} • ${mon.mclass} • Lv ${mon.level} • Evo ${mon.evo}</div>
+        </div>
+        <div class="pill mono">ID: ${mon.id}</div>
+      </div>
+      <img class="preview glow" src="${mon.img}" alt="${mon.name}">
+      <div class="stats">
+        ${renderBars(mon.currentHP, mon.stats.hp, mon.stam, mon.stats.stam)}
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:8px">
+        <div class="muted">ATK <span class="mono">${mon.stats.atk}</span> • DEF <span class="mono">${mon.stats.def}</span> • SPD <span class="mono">${mon.stats.spd}</span></div>
+        <div class="row">
+          <button class="btnAddTeam" data-id="${mon.id}">Add to Team</button>
+          <button class="btnBreak" data-id="${mon.id}">Break → Shards</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ================== INVENTORY, TEAM, SHARDS, EVOLVE ==================
+function addInventory(itemId, name, qty){
+  state.inventory[itemId] = (state.inventory[itemId]||0)+qty;
+  // Track mythics separately for the Mythic tab (also in inventory)
+  if(itemId.startsWith("mythic")) state.mythics[itemId] = (state.mythics[itemId]||0)+qty;
+  saveState();
+}
+function animateFly(text, fromEl){
+  const r = fromEl.getBoundingClientRect();
+  const el = el("div",{class:"fly", html:text});
+  el.style.left = r.left+"px";
+  el.style.top = r.top+"px";
+  el.style.opacity = "1";
+  document.body.appendChild(el);
+  const inv = $("#tabs .tab[data-tab='inventory']").getBoundingClientRect();
+  requestAnimationFrame(()=>{
+    el.style.transform = `translate(${inv.left-r.left}px, ${inv.top-r.top}px) scale(0.6)`;
+    el.style.opacity = "0";
+  });
+  setTimeout(()=>el.remove(),900);
+}
+function breakIntoShards(mon){
+  const tier = mon.rarity==="rare" ? "rare" : mon.rarity==="uncommon" ? "uncommon" : "common";
+  const qty = mon.rarity==="rare"? between([6,10]) : mon.rarity==="uncommon"? between([3,6]) : between([1,3]);
+  addInventory(`shard_${tier}`, `${tier} shard`, qty);
+}
+function canEvolve(mon){
+  if(mon.evo>=EVO_MAX) return false;
+  const needLevel = EVO_GATES[mon.evo]||999;
+  const shardType = mon.rarity==="rare"?"shard_rare":mon.rarity==="uncommon"?"shard_uncommon":"shard_common";
+  const needShards = 3+mon.evo*2; // scales by evo tier
+  const has = state.inventory[shardType]||0;
+  return mon.level>=needLevel && has>=needShards;
+}
+function evolve(mon){
+  if(!canEvolve(mon)) return false;
+  const shardType = mon.rarity==="rare"?"shard_rare":mon.rarity==="uncommon"?"shard_uncommon":"shard_common";
+  const cost = 3+mon.evo*2;
+  state.inventory[shardType] = (state.inventory[shardType]||0)-cost;
+  mon.evo++;
+  // big stat bump per evolution (10% total scala)
+  const mult = 1+mon.evo*0.10;
+  const newStats = computeStats(mon.element, mon.mclass, mon.rarity, mon.level);
+  mon.stats = {
+    hp: Math.round(newStats.hp*mult),
+    atk: Math.round(newStats.atk*mult),
+    def: Math.round(newStats.def*mult),
+    spd: Math.round(newStats.spd*mult),
+    stam: Math.round(newStats.stam*mult)
+  };
+  mon.currentHP = mon.stats.hp;
+  mon.stam = mon.stats.stam;
+  saveState();
+  return true;
+}
+function addMonster(mon){
+  state.monsters.push(mon);
+  state.codex[mon.key]=true;
+  saveState();
+}
+function getMonster(id){ return state.monsters.find(m=>m.id===id); }
+function removeMonster(id){
+  state.monsters = state.monsters.filter(m=>m.id!==id);
+  state.team = state.team.filter(t=>t!==id);
+  saveState();
+}
+
+// ================== BATTLES ==================
+function enemyFrom(keyOrUnknown, tier){ // tier: 'wild' | 'mini' | 'boss'
+  if(tier==="wild"){
+    // 85% real monster library, 15% unknown beast
+    const keys = Object.keys(MONSTER_LIBRARY);
+    const pickUnknown = Math.random()<0.15;
+    if(pickUnknown) return buildEnemy("wild", WILD_UNKNOWN, "common");
+    const k = keys[Math.floor(Math.random()*keys.length)];
+    return buildEnemy("wild", MONSTER_LIBRARY[k], "common");
+  }else if(tier==="mini"){
+    const keys = Object.keys(MONSTER_LIBRARY);
+    const k = keys[Math.floor(Math.random()*keys.length)];
+    return buildEnemy("mini", MONSTER_LIBRARY[k], "uncommon");
+  }else{ // boss
+    const keys = Object.keys(MONSTER_LIBRARY);
+    const k = keys[Math.floor(Math.random()*keys.length)];
+    return buildEnemy("boss", MONSTER_LIBRARY[k], "boss");
+  }
+}
+function buildEnemy(type, lib, rarity){
+  // bosses tougher (lvl 20-35), mini (10-20), wild (3-10)
+  const lvl = type==="boss" ? between([20,35]) : type==="mini" ? between([10,20]) : between([3,10]);
+  const name = lib.codexName || "Wild Beast";
+  const img = lib.img ? PATHS.DIGITAL_DIR + lib.img : "";
+  const element = lib.element || "nature";
+  const mclass = lib.mclass || "Brawler";
+  const stats = computeStats(element, mclass, rarity, lvl);
+  return { type, name, element, mclass, img, rarity, level:lvl, stats, hp:stats.hp, stam:stats.stam };
+}
+function teamPower(){
+  const ids = state.team.slice(0,TEAM_SIZE);
+  const mons = ids.map(getMonster).filter(Boolean);
+  let total = { atk:0, def:0, spd:0, hp:0 };
+  mons.forEach(m=>{
+    total.atk+=m.stats.atk; total.def+=m.stats.def; total.spd+=m.stats.spd; total.hp+=m.stats.hp;
+  });
+  return { mons, total };
+}
+function simulateBattle(tier){ // simple auto resolver
+  const enemy = enemyFrom(null, tier);
+  const { mons, total } = teamPower();
+  if(mons.length===0){ return { ok:false, msg:"No team selected."}; }
+  // Compute win chance: compare (team atk+def+spd) vs (enemy stats)
+  const teamScore = total.atk*1.0 + total.def*0.9 + total.spd*0.6;
+  const enemyScore = enemy.stats.atk*1.1 + enemy.stats.def*1.0 + enemy.stats.spd*0.7 + (enemy.level*2);
+  let baseWin = teamScore / (teamScore + enemyScore);
+  // Guarantee rough goals: boss ~7% win (as requested), mini moderate, wild decent
+  if(tier==="boss") baseWin = Math.min(baseWin, 0.07);
+  if(tier==="mini") baseWin = Math.min(Math.max(baseWin,0.25), 0.55);
+  if(tier==="wild") baseWin = Math.min(Math.max(baseWin,0.55), 0.85);
+
+  const win = Math.random() < baseWin;
+  const drops = sumLoot(LOOT_TABLES[tier]);
+  return { ok:true, win, enemy, drops, baseWin };
+}
+
+// ================== UI RENDERERS ==================
+function drawInventory(){
+  const box = $("#invList"); box.innerHTML="";
+  const entries = Object.entries(state.inventory);
+  if(entries.length===0){ box.innerHTML = `<div class="muted">Empty.</div>`; return;}
+  for(const [id,qty] of entries){
+    const row = el("div",{class:"item"},[
+      el("div",{html:`<strong>${id}</strong>`}),
+      el("div",{html:`x <span class="mono">${qty}</span>`})
+    ]);
+    box.appendChild(row);
+  }
+  drawKillCounts();
+}
+function drawTeam(){
+  const slots = $("#teamSlots"); slots.innerHTML="";
+  for(let i=0;i<TEAM_SIZE;i++){
+    const id = state.team[i];
+    const mon = id ? getMonster(id) : null;
+    const wrap = el("div",{class:"item"});
+    if(mon){
+      wrap.innerHTML = `
+        <div>
+          <div><strong>${mon.name}</strong> <span class="${rarityClass(mon.rarity)}">${mon.rarity.toUpperCase()}</span></div>
+          <div class="muted">${mon.element} • ${mon.mclass} • Lv ${mon.level} • Evo ${mon.evo}</div>
+        </div>
+        <div class="row">
+          <button class="btnRemoveSlot" data-idx="${i}">Remove</button>
+          <button class="btnEvolve" data-id="${mon.id}">Evolve</button>
+        </div>
+      `;
+    }else{
+      wrap.innerHTML = `<div class="muted">Empty slot</div>`;
+    }
+    slots.appendChild(wrap);
+  }
+}
+function drawMonsters(){
+  const list = $("#monsterList"); list.innerHTML="";
+  if(state.monsters.length===0){ list.innerHTML = `<div class="muted">No monsters yet.</div>`; return;}
+  state.monsters.forEach(m=>{
+    const row = el("div",{class:"item"});
+    row.innerHTML = `
+      <div>
+        <div><strong>${m.name}</strong> <span class="${rarityClass(m.rarity)}">${m.rarity.toUpperCase()}</span></div>
+        <div class="muted">${m.element} • ${m.mclass} • Lv ${m.level} • Evo ${m.evo}</div>
+      </div>
+      <div class="row">
+        <button class="btnAddTeam" data-id="${m.id}">Add to Team</button>
+        <button class="btnBreak" data-id="${m.id}">Break</button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+function drawCodex(){
+  const grid = $("#codexGrid"); grid.innerHTML="";
+  const keys = Object.keys(MONSTER_LIBRARY);
+  keys.forEach(k=>{
+    const lib = MONSTER_LIBRARY[k];
+    const known = !!state.codex[k];
+    const card = el("div",{class:"codex-card"});
+    card.innerHTML = `
+      <img src="${PATHS.DIGITAL_DIR+lib.img}" class="${known?"":"silhouette"}" alt="${lib.codexName}">
+      <div style="margin-top:6px"><strong>${lib.codexName}</strong></div>
+      <div class="muted">${k}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+function drawMythics(){
+  const box = $("#mythicList"); box.innerHTML="";
+  const entries = Object.entries(state.mythics);
+  if(entries.length===0){ box.innerHTML = `<div class="muted">No mythic items yet.</div>`; return; }
+  for(const [id,qty] of entries){
+    const row = el("div",{class:"item"},[
+      el("div",{html:`<strong>${id}</strong>`}),
+      el("div",{html:`x <span class="mono">${qty}</span>`})
+    ]);
+    box.appendChild(row);
+  }
+}
+function drawKillCounts(){
+  const box = $("#killCounts"); box.innerHTML="";
+  const rows = [
+    ["Wild", state.kills.wild],
+    ["Mini-Boss", state.kills.mini],
+    ["Boss", state.kills.boss]
+  ];
+  rows.forEach(([name,val])=>{
+    const r = el("div",{class:"item"},[
+      el("div",{html:`<strong>${name}</strong>`}),
+      el("div",{html:`<span class="mono">${val}</span>`})
+    ]);
+    box.appendChild(r);
+  });
+}
+function renderSettings(){
+  $("#confRange").value = String(CONFIDENCE_THRESHOLD);
+  $("#confVal").textContent = String(CONFIDENCE_THRESHOLD);
+}
+
+// ================== TABS ==================
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(n=>n.classList.remove("active"));
+    t.classList.add("active");
+    const name = t.getAttribute("data-tab");
+    document.querySelectorAll("main>section").forEach(s=>s.classList.add("hidden"));
+    $("#"+name).classList.remove("hidden");
+  });
+});
+
+// ================== CAPTURE FLOW ==================
+$("#btnStart").addEventListener("click", async ()=>{
+  await startCamera();
+});
+$("#btnFlip").addEventListener("click", async ()=>{
+  useRear = !useRear;
+  await startCamera();
+});
+$("#btnRetake").addEventListener("click", async ()=>{
+  $("#resultBox").innerHTML = "Retake ready.";
+  await startCamera();
+});
+
+$("#fileInput").addEventListener("change", async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const img = new Image();
+  img.onload = async ()=>{
+    const c = $("#frame"); const ctx = c.getContext("2d");
+    c.width = img.width; c.height = img.height; ctx.drawImage(img,0,0);
+    await handlePredictionFromCanvas(c);
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+$("#btnCapture").addEventListener("click", async ()=>{
+  const v = $("#webcam");
+  if(!stream || !v.videoWidth){ $("#errorBox").textContent = "No webcam stream available."; return; }
+  const c = $("#frame"); const ctx = c.getContext("2d");
+  c.width = v.videoWidth; c.height = v.videoHeight; ctx.drawImage(v,0,0);
+  // Freeze camera till retake
+  stopCamera();
+  $("#btnCapture").disabled = true;
+  $("#btnRetake").disabled = false;
+  await handlePredictionFromCanvas(c);
+});
+
+async function handlePredictionFromCanvas(canvas){
+  $("#errorBox").textContent = "";
+  $("#resultBox").innerHTML = `<div class="muted">Classifying...</div>`;
+  try{
+    await ensureModel();
+    const preds = await model.predict(canvas);
+    preds.sort((a,b)=>b.probability-a.probability);
+    const top = preds[0];
+    const label = (top.className||"").toLowerCase();
+    const conf  = top.probability||0;
+
+    // Reject if low confidence or explicitly none/unknown class
+    if(conf < CONFIDENCE_THRESHOLD || label==="none" || label==="unknown"){
+      $("#resultBox").innerHTML = `
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <strong>Rejected</strong>
+            <span class="pill mono">conf=${(conf*100).toFixed(1)}%</span>
+          </div>
+          <div class="muted">Low confidence or “none/unknown”. Try a clearer shot of a supported animal class.</div>
+        </div>`;
+      return;
+    }
+
+    // Duplicate prevention by image hash
+    const imgHash = await sha256FromCanvas(canvas);
+    const dup = state.monsters.find(m=>m.hash===imgHash);
+    if(dup){
+      $("#resultBox").innerHTML = `
+        <div class="card">
+          <strong>Duplicate photo detected</strong>
+          <div class="muted">This image was used to create <span class="mono">${dup.name}</span>. Try a new angle or subject.</div>
+        </div>`;
+      return;
+    }
+
+    const mon = makeMonsterFromLabel(label, conf, imgHash);
+    if(!mon){
+      // Unknown class — don’t create a monster card, but we can show Wild Beast “tease”
+      $("#resultBox").innerHTML = `
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <strong>No matching monster</strong>
+            <span class="pill mono">conf=${(conf*100).toFixed(1)}%</span>
+          </div>
+          <div class="muted">Your model class <span class="mono">${label}</span> isn’t registered yet in MONSTER_LIBRARY.</div>
+        </div>`;
+      return;
+    }
+
+    addMonster(mon);
+    // Show card
+    $("#resultBox").innerHTML = monsterCard(mon);
+    // Small glow on rarity
+    $("#resultBox .card").classList.add("glow");
+
+    // Loot a tiny chance even on capture to keep excitement
+    if(roll(0.12)){
+      const bonus = [{id:"potion_small", name:"Small Potion", qty:1}];
+      grantLoot(bonus, $("#resultBox .card"));
+    }
+
+    // Wire buttons on the newly rendered card
+    wireDynamicButtons();
+    // Refresh other views
+    drawMonsters(); drawTeam(); drawCodex(); drawInventory();
+  }catch(err){
+    $("#resultBox").innerHTML = `<div class="muted">Error: ${err.message}</div>`;
+  }
+}
+
+// ================== DYNAMIC BUTTONS (delegated) ==================
+function wireDynamicButtons(){
+  document.querySelectorAll(".btnAddTeam").forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.getAttribute("data-id");
+      if(state.team.includes(id)) return;
+      if(state.team.length>=TEAM_SIZE){ alert("Team full. Remove a slot first."); return; }
+      state.team.push(id); saveState(); drawTeam();
+    };
+  });
+  document.querySelectorAll(".btnBreak").forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.getAttribute("data-id");
+      const mon = getMonster(id); if(!mon) return;
+      if(confirm(`Break ${mon.name} into shards? This cannot be undone.`)){
+        breakIntoShards(mon);
+        removeMonster(id);
+        drawInventory(); drawMonsters(); drawTeam();
+      }
+    };
+  });
+  document.querySelectorAll(".btnRemoveSlot").forEach(b=>{
+    b.onclick = ()=>{
+      const idx = +b.getAttribute("data-idx");
+      state.team.splice(idx,1); saveState(); drawTeam();
+    };
+  });
+  document.querySelectorAll(".btnEvolve").forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.getAttribute("data-id");
+      const mon = getMonster(id); if(!mon) return;
+      if(!canEvolve(mon)){
+        alert("Requirements not met: need level gate + shards.");
+        return;
+      }
+      evolve(mon);
+      drawTeam(); drawMonsters(); drawInventory();
+    };
+  });
+}
+
+// ================== BATTLE WIRES ==================
+$("#btnWild").addEventListener("click",()=>startBattle("wild"));
+$("#btnMini").addEventListener("click",()=>startBattle("mini"));
+$("#btnBoss").addEventListener("click",()=>startBattle("boss"));
+
+function startBattle(tier){
+  const res = simulateBattle(tier);
+  const box = $("#battleView");
+  if(!res.ok){ box.innerHTML = `<div class="muted">${res.msg}</div>`; return; }
+  const enemy = res.enemy;
+  // Outcome
+  const header = `
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div>
+        <div><strong>${enemy.name}</strong> <span class="${rarityClass(enemy.rarity)}">${enemy.rarity.toUpperCase()}</span></div>
+        <div class="muted">${enemy.element} • ${enemy.mclass} • Lv ${enemy.level}</div>
+      </div>
+      <div class="pill mono">Win chance ~ ${Math.round(res.baseWin*100)}%</div>
+    </div>
+  `;
+  const art = enemy.img? `<img class="preview ${outlineClass(enemy.rarity)}" src="${enemy.img}" alt="${enemy.name}">`
+                       : `<div class="preview" style="height:180px;display:flex;align-items:center;justify-content:center;border:1px dashed #2a325e">Silhouette</div>`;
+  const resultTxt = res.win ? `<span style="color:${getComputedStyle(document.documentElement).getPropertyValue('--good')}">Victory!</span>` :
+                              `<span style="color:${getComputedStyle(document.documentElement).getPropertyValue('--bad')}">Defeat</span>`;
+  const drops = res.win ? res.drops : [];
+  box.innerHTML = `
+    <div class="card">
+      ${header}
+      ${art}
+      <div class="row" style="justify-content:space-between;margin-top:8px">
+        <div><strong>Result:</strong> ${resultTxt}</div>
+        <div class="muted">HP ${enemy.stats.hp} • ATK ${enemy.stats.atk} • DEF ${enemy.stats.def} • SPD ${enemy.stats.spd}</div>
+      </div>
+      <div id="dropZone"></div>
+    </div>
+  `;
+  // tally kills
+  if(res.win){
+    if(enemy.type==="boss") state.kills.boss++; else if(enemy.type==="mini") state.kills.mini++; else state.kills.wild++;
+    // Loot fly-to-inventory animation
+    if(drops.length){
+      const dz = $("#dropZone");
+      dz.innerHTML = `<div style="margin-top:8px"><strong>Loot</strong></div>`;
+      drops.forEach(d=>{
+        const chip = el("div",{class:"pill", html:`${d.name} x${d.qty}`});
+        dz.appendChild(chip);
+        // add + animate
+        addInventory(d.id, d.name, d.qty);
+        animateFly(`+${d.qty} ${d.name}`, chip);
+      });
+      drawInventory();
+    }
+    // Quick XP for team on win
+    state.team.forEach(id=>{
+      const m = getMonster(id); if(!m) return;
+      m.exp += enemy.type==="boss"? 45 : enemy.type==="mini"? 25 : 12;
+      // level-up: need exp >= level*20
+      while(m.exp >= m.level*20){
+        m.exp -= m.level*20;
+        m.level++;
+        // Recompute stats on level up
+        m.stats = computeStats(m.element, m.mclass, m.rarity, m.level);
+        m.currentHP = m.stats.hp; m.stam = m.stats.stam;
+      }
+    });
+  }
+  saveState();
+  drawKillCounts();
+  drawTeam();
+}
+
+// ================== SETTINGS & DATA WIRES ==================
+$("#confRange").addEventListener("input",(e)=>{
+  CONFIDENCE_THRESHOLD = +e.target.value;
+  $("#confVal").textContent = String(CONFIDENCE_THRESHOLD);
+  saveState();
+});
+$("#btnReset").addEventListener("click",()=>{
+  if(confirm("Reset all local data? This cannot be undone.")){
+    store.reset(); loadState();
+    drawInventory(); drawTeam(); drawMonsters(); drawCodex(); drawKillCounts(); renderSettings();
+  }
+});
+$("#btnExport").addEventListener("click",()=>{
+  const data = JSON.stringify(state,null,2);
+  const blob = new Blob([data],{type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download="monster_transform_save.json"; a.click();
+  URL.revokeObjectURL(url);
+});
+$("#btnImport").addEventListener("click",()=>$("#importFile").click());
+$("#importFile").addEventListener("change",async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const text = await file.text();
+  try{
+    const data = JSON.parse(text);
+    store.set(data); loadState();
+    drawInventory(); drawTeam(); drawMonsters(); drawCodex(); drawKillCounts(); renderSettings();
+    alert("Save imported.");
+  }catch{ alert("Invalid save file."); }
+});
+
+// ================== SERVICE WORKER (offline runtime cache) ==================
+(async function registerSW(){
+  if(!("serviceWorker" in navigator)) return;
+  const swCode = `
+  const CNAME="mt-cache-v1";
+  self.addEventListener("install",e=>{ self.skipWaiting(); });
+  self.addEventListener("activate",e=>{ e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CNAME).map(k=>caches.delete(k))))); self.clients.claim(); });
+  self.addEventListener("fetch",e=>{
+    const req=e.request;
+    // Runtime cache-first for model and images
+    if(req.url.includes("/model_real/") || req.url.includes("/digital_images/") || req.destination==="image"){
+      e.respondWith(caches.open(CNAME).then(async cache=>{
+        const hit = await cache.match(req); if(hit) return hit;
+        try{ const res = await fetch(req); cache.put(req,res.clone()); return res; }catch(err){ return hit || Response.error(); }
+      }));
+    }
+  });`;
+  const blob = new Blob([swCode],{type:"text/javascript"});
+  const url = URL.createObjectURL(blob);
+  try{ await navigator.serviceWorker.register(url); }catch{}
+})();
+
+// ================== INIT ==================
+function initUI(){
+  loadState();
+  renderSettings();
+  $("#confVal").textContent = String(CONFIDENCE_THRESHOLD);
+  drawInventory(); drawTeam(); drawMonsters(); drawCodex(); drawKillCounts(); drawMythics();
+  wireDynamicButtons();
+}
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) stopCamera(); });
+
+initUI();
+</script>
+</body>
+</html>  .stack{display:flex;gap:8px;flex-wrap:wrap}
   .statbar{height:12px;background:#2a2a2a;border:1px solid #333;border-radius:999px;overflow:hidden}
   .statbar>.fill{height:100%}
   .hp{background:#d32f2f}.stam{background:#43a047}
@@ -2250,5 +3223,6 @@ byId("btnBoss").addEventListener("click", ()=> runBattle(true));
 </script>
 </body>
 </html>
+
 
 
