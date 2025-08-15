@@ -1,148 +1,728 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Monster Transform Game - Debug Mode</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #222; color: #fff; }
-        h1 { margin-top: 20px; }
-        video, img { max-width: 90%; margin-top: 10px; border: 4px solid #fff; border-radius: 10px; }
-        button { padding: 10px 20px; font-size: 16px; margin-top: 15px; cursor: pointer; border-radius: 5px; }
-        .monster-card { margin-top: 20px; padding: 15px; background: #333; border-radius: 10px; display: inline-block; }
-        .monster-card img { width: 200px; height: auto; border-radius: 10px; }
-        .stats { margin-top: 10px; text-align: left; }
-        #errorLog { background: #a00; padding: 10px; border-radius: 5px; margin: 10px; display: none; }
-    </style>
+  <meta charset="utf-8" />
+  <title>Monster Transform Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Minimal reset + dark theme -->
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, Arial, sans-serif; background:#121212; color:#fff; }
+    header { padding:14px 12px; background:#1e1e1e; position:sticky; top:0; z-index:10; border-bottom:1px solid #2a2a2a; }
+    h1 { margin:0; font-size:20px; letter-spacing:0.2px; }
+    #tabs { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .tab-btn { padding:8px 12px; border:1px solid #2c2c2c; background:#1b1b1b; border-radius:10px; cursor:pointer; }
+    .tab-btn.active { background:#2b2b2b; border-color:#3c3c3c; }
+    main { padding:14px; }
+    .panel { display:none; }
+    .panel.active { display:block; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    video, canvas, img { width:100%; max-width:560px; border:2px solid #393939; border-radius:12px; }
+    .btn { padding:10px 14px; border:1px solid #2f2f2f; background:#232323; border-radius:10px; cursor:pointer; }
+    .btn:disabled { opacity:0.6; cursor:not-allowed; }
+    .primary { background:#2d6cdf; border-color:#3a78e0; }
+    .danger { background:#8a1c1c; border-color:#a22828; }
+    .success { background:#166f3b; border-color:#1f8d4d; }
+    .card { border:1px solid #2a2a2a; border-radius:14px; padding:12px; background:#171717; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+    .label { font-size:12px; opacity:0.8; }
+    .kv { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #2a2a2a; }
+    .kv:last-child { border-bottom:none; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #2a2a2a; }
+    #errorLog { display:none; margin:10px 0; padding:10px; border-radius:10px; background:#5b1f1f; border:1px solid #7a2a2a; }
+    .section-title { margin:6px 0 10px; font-weight:700; }
+    .row-split { display:flex; gap:12px; flex-wrap:wrap; }
+    .row-split > * { flex:1 1 300px; }
+    .stack { display:flex; flex-direction:column; gap:8px; }
+    .moves { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+    .log { white-space:pre-wrap; background:#0f0f0f; border:1px solid #2a2a2a; border-radius:10px; padding:8px; min-height:80px; }
+    .team-slot { padding:6px; border:1px dashed #3a3a3a; border-radius:12px; min-height:60px; text-align:center; }
+  </style>
+
+  <!-- TFJS + Teachable Machine -->
+  <!-- [A1] If you must pin versions, use these two script tags. -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
 </head>
 <body>
+  <header>
     <h1>Monster Transform Game</h1>
-    <p>Take a picture of an animal to see its monster form!</p>
+    <div id="tabs">
+      <button class="tab-btn active" data-tab="capture">Capture</button>
+      <button class="tab-btn" data-tab="collection">Collection</button>
+      <button class="tab-btn" data-tab="team">Team</button>
+      <button class="tab-btn" data-tab="battle">Wild Battle</button>
+      <button class="tab-btn" data-tab="pvp">Local PvP</button>
+    </div>
+  </header>
 
+  <main>
     <div id="errorLog"></div>
 
-    <video id="webcam" autoplay playsinline></video><br>
-    <button id="captureBtn">📸 Capture Photo</button>
-    <canvas id="canvas" style="display:none;"></canvas>
+    <!-- CAPTURE PANEL -->
+    <section id="panel-capture" class="panel active">
+      <p>Take a picture of an animal to see its monster form!</p>
+      <div class="stack">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <div class="row">
+          <button id="btnCapture" class="btn primary">📸 Capture Photo</button>
+          <button id="btnRetake" class="btn" style="display:none;">🔁 Retake</button>
+        </div>
+        <div id="captureResult" class="card" style="display:none;"></div>
+      </div>
+    </section>
 
-    <div id="result"></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
-<script>
-  const URL = "model_real/";
-
-  // Debug: check that the 3 model files are actually being served
-  (async () => {
-    const files = ["model.json", "metadata.json", "weights.bin"];
-    for (const file of files) {
-      try {
-        const res = await fetch(`${URL}${file}`, { cache: "no-store" });
-        if (res.ok) console.log(`✅ Found: ${file}`);
-        else console.error(`❌ Missing or not accessible: ${file} (HTTP ${res.status})`);
-      } catch (err) {
-        console.error(`⚠️ Error fetching ${file}:`, err);
-      }
-    }
-  })();
-
-  let model, webcamStream;
-
-  const monsterData = {
-    ladybug:  { image: "digital_images/ladybug.png.jpeg",  type: "Tank" },
-    squirrel: { image: "digital_images/squirrel.png.jpeg", type: "Rogue" },
-    dog:      { image: "digital_images/dog.png.jpeg",      type: "Brawler" },
-    cat:      { image: "digital_images/cat.png.jpeg",      type: "Assassin" },
-    spider:   { image: "digital_images/spider.png.jpeg",   type: "Trapper" },
-    fly:      { image: "digital_images/fly.png.jpeg",      type: "Scout" }
-  };
-
-  function logError(msg) {
-    const logBox = document.getElementById("errorLog");
-    logBox.style.display = "block";
-    logBox.innerHTML = `<strong>Error:</strong> ${msg}`;
-    console.error(msg);
-  }
-
-  async function init() {
-    // 1) Load model
-    try {
-      model = await tmImage.load(`${URL}model.json`, `${URL}metadata.json`);
-      console.log("✅ Model loaded successfully");
-    } catch (err) {
-      logError("Failed to load model: " + err.message +
-               " — Check that model_real/ contains model.json, metadata.json, weights.bin.");
-      return;
-    }
-
-    // 2) Start camera: try rear, fallback to front
-    try {
-      let constraints = { video: { facingMode: { ideal: "environment" } } };
-      try {
-        webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log("✅ Rear camera started successfully");
-      } catch (rearErr) {
-        console.warn("Rear camera failed, trying front camera...", rearErr);
-        constraints = { video: { facingMode: "user" } };
-        webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log("✅ Front camera started successfully");
-      }
-      document.getElementById("webcam").srcObject = webcamStream;
-    } catch (err) {
-      logError(`Camera could not start: ${err.name} — ${err.message}`);
-      console.error("Full camera error:", err);
-      return;
-    }
-  }
-
-  document.getElementById("captureBtn").addEventListener("click", async () => {
-    if (!webcamStream) {
-      logError("No webcam stream available.");
-      return;
-    }
-    const videoElement = document.getElementById("webcam");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = videoElement.videoWidth;
-    canvas.height = videoElement.videoHeight;
-    ctx.drawImage(videoElement, 0, 0);
-
-    // Stop camera to “freeze” the capture
-    webcamStream.getTracks().forEach(track => track.stop());
-
-    try {
-      const prediction = await model.predict(canvas);
-      prediction.sort((a, b) => b.probability - a.probability);
-      const top = prediction[0]?.className?.toLowerCase();
-      if (top && monsterData[top]) {
-        showMonster(top);
-      } else {
-        document.getElementById("result").innerHTML =
-          `<p>No matching monster found for "${top ?? "unknown"}".</p>`;
-      }
-    } catch (err) {
-      logError("Prediction failed: " + err.message);
-      console.error("Prediction error:", err);
-    }
-  });
-
-  function showMonster(name) {
-    const monster = monsterData[name];
-    const health = Math.floor(Math.random() * 51) + 50;
-    const attack = Math.floor(Math.random() * 51) + 20;
-    document.getElementById("result").innerHTML = `
-      <div class="monster-card">
-        <h2>${name.toUpperCase()} — ${monster.type}</h2>
-        <img src="${monster.image}" alt="${name}">
-        <div class="stats">
-          <p><strong>Health:</strong> ${health}</p>
-          <p><strong>Attack:</strong> ${attack}</p>
+    <!-- COLLECTION PANEL -->
+    <section id="panel-collection" class="panel">
+      <div class="row-split">
+        <div>
+          <div class="section-title">Your Monsters</div>
+          <div id="collectionGrid" class="grid"></div>
+        </div>
+        <div>
+          <div class="section-title">Shards</div>
+          <div id="shardList" class="card"></div>
         </div>
       </div>
-    `;
-  }
+    </section>
 
-  init();
-</script>
+    <!-- TEAM PANEL -->
+    <section id="panel-team" class="panel">
+      <div class="section-title">Team (3 slots)</div>
+      <div id="teamSlots" class="row">
+        <div class="team-slot" data-slot="0">Empty</div>
+        <div class="team-slot" data-slot="1">Empty</div>
+        <div class="team-slot" data-slot="2">Empty</div>
+      </div>
+      <p class="label" style="margin-top:8px;">Tip: Add/remove monsters to your team from the Collection panel.</p>
+    </section>
+
+    <!-- WILD BATTLE PANEL -->
+    <section id="panel-battle" class="panel">
+      <div class="row-split">
+        <div class="card">
+          <div class="section-title">Choose Your Fighter</div>
+          <select id="battleMySelect" class="btn" style="width:100%;"></select>
+          <button id="btnStartWild" class="btn primary" style="margin-top:8px;">Start Wild Battle</button>
+        </div>
+        <div class="card">
+          <div class="section-title">Battle</div>
+          <div id="battleArea" class="stack"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOCAL PVP PANEL -->
+    <section id="panel-pvp" class="panel">
+      <div class="row-split">
+        <div class="card">
+          <div class="section-title">Pick Monsters</div>
+          <label class="label">Player 1</label>
+          <select id="p1Select" class="btn" style="width:100%;"></select>
+          <label class="label" style="margin-top:8px;">Player 2</label>
+          <select id="p2Select" class="btn" style="width:100%;"></select>
+          <button id="btnStartPVP" class="btn primary" style="margin-top:8px;">Start PvP Match</button>
+        </div>
+        <div class="card">
+          <div class="section-title">PvP Battle</div>
+          <div id="pvpArea" class="stack"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // =========================
+    // CONFIG & CONSTANTS
+    // =========================
+
+    // [B1] TODO: If you rename your model folder, change this:
+    const MODEL_PATH = "model_real/";  // e.g., "model_real/"
+    const DIGITAL_DIR = "digital_images/"; // [B2] Your monster art folder
+
+    // [B3] Class -> species template mapping.
+    // Keys MUST match your Teachable Machine classNames (lowercase recommended).
+    const SPECIES = {
+      ladybug:  { img: DIGITAL_DIR + "ladybug.png",  base: {hp:60, atk:25, def:20, spd:30, luk:20}, rarity:"Common", shardsOnBreak: 10 },
+      squirrel: { img: DIGITAL_DIR + "squirrel.png", base: {hp:70, atk:22, def:18, spd:35, luk:22}, rarity:"Common", shardsOnBreak: 10 },
+      dog:      { img: DIGITAL_DIR + "dog.png",      base: {hp:75, atk:28, def:24, spd:28, luk:18}, rarity:"Uncommon", shardsOnBreak: 12 },
+      cat:      { img: DIGITAL_DIR + "cat.png",      base: {hp:65, atk:30, def:20, spd:36, luk:24}, rarity:"Uncommon", shardsOnBreak: 12 },
+      spider:   { img: DIGITAL_DIR + "spider.png",   base: {hp:55, atk:26, def:18, spd:40, luk:28}, rarity:"Rare",    shardsOnBreak: 16 },
+      fly:      { img: DIGITAL_DIR + "fly.png",      base: {hp:50, atk:20, def:15, spd:44, luk:26}, rarity:"Rare",    shardsOnBreak: 16 }
+    };
+
+    // Move set (kept simple & kid-friendly)
+    const MOVES = {
+      quick:   { name:"Quick Jab", power: 0.9, acc: 0.95 },
+      heavy:   { name:"Heavy Strike", power: 1.25, acc: 0.80 },
+      focus:   { name:"Focus Up", power: 0.0, acc: 1.00, buff:{atk:+5, def:+3} }
+    };
+
+    // LocalStorage keys
+    const LS_MON = "ml_monsters";
+    const LS_TEAM = "ml_team";
+    const LS_SHARDS = "ml_shards";
+
+    // Globals
+    let model = null;
+    let webcamStream = null;
+
+    // UI elements
+    const webcamEl = document.getElementById("webcam");
+    const canvasEl = document.getElementById("canvas");
+    const ctx = canvasEl.getContext("2d");
+    const btnCapture = document.getElementById("btnCapture");
+    const btnRetake = document.getElementById("btnRetake");
+    const captureResult = document.getElementById("captureResult");
+    const errorLog = document.getElementById("errorLog");
+
+    // =========================
+    // UTILITIES
+    // =========================
+    function logError(msg) {
+      errorLog.style.display = "block";
+      errorLog.textContent = msg;
+      console.error(msg);
+    }
+    function clearError() {
+      errorLog.style.display = "none";
+      errorLog.textContent = "";
+    }
+    function uid() {
+      return "m_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+    }
+    function rng(min, max) { return Math.floor(Math.random()*(max-min+1))+min; }
+
+    function loadJSON(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+    }
+    function saveJSON(key, obj) {
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+
+    // =========================
+    // STORAGE MODEL
+    // =========================
+    function getCollection() { return loadJSON(LS_MON, []); }
+    function setCollection(arr) { saveJSON(LS_MON, arr); refreshAllViews(); }
+
+    function getTeam() { return loadJSON(LS_TEAM, [null,null,null]); }
+    function setTeam(arr) { saveJSON(LS_TEAM, arr); refreshTeamView(); }
+
+    function getShards() { return loadJSON(LS_SHARDS, {}); }
+    function setShards(obj) { saveJSON(LS_SHARDS, obj); refreshShardView(); }
+
+    function addMonster(mon) {
+      const col = getCollection();
+      col.push(mon);
+      setCollection(col);
+    }
+    function removeMonsterById(id) {
+      const col = getCollection().filter(m => m.id !== id);
+      setCollection(col);
+      // also remove from team if present
+      const team = getTeam().map(t => t === id ? null : t);
+      setTeam(team);
+    }
+    function findMonster(id) { return getCollection().find(m => m.id === id) || null; }
+
+    // =========================
+    // MODEL & CAMERA
+    // =========================
+    async function verifyModelFiles() {
+      const files = ["model.json","metadata.json","weights.bin"];
+      for (const f of files) {
+        try {
+          const res = await fetch(MODEL_PATH + f, { cache: "no-store" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          console.log("Found:", f);
+        } catch (e) {
+          logError(`Missing or inaccessible model file: ${f} — check /${MODEL_PATH}${f}`);
+          throw e;
+        }
+      }
+    }
+
+    async function loadModel() {
+      await verifyModelFiles();
+      model = await tmImage.load(MODEL_PATH + "model.json", MODEL_PATH + "metadata.json");
+      console.log("✅ Model loaded");
+    }
+
+    async function startCamera() {
+      // Must be HTTPS or localhost
+      const isSecure = location.protocol === "https:" || location.hostname === "localhost";
+      if (!isSecure) {
+        logError("Camera requires HTTPS or localhost. If on GitHub Pages you’re good; if testing locally, use a local server.");
+        return;
+      }
+      const constraintsRear = { video: { facingMode: { ideal: "environment" } }, audio: false };
+      const constraintsFront = { video: { facingMode: "user" }, audio: false };
+      try {
+        webcamStream = await navigator.mediaDevices.getUserMedia(constraintsRear);
+      } catch (e) {
+        console.warn("Rear cam failed, trying front:", e);
+        webcamStream = await navigator.mediaDevices.getUserMedia(constraintsFront);
+      }
+      webcamEl.srcObject = webcamStream;
+      await webcamEl.play();
+      console.log("🎥 Camera started");
+    }
+
+    function stopCamera() {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(t => t.stop());
+        webcamStream = null;
+      }
+      webcamEl.srcObject = null;
+    }
+
+    // =========================
+    // MONSTER GENERATION
+    // =========================
+    function rollStats(base, rarity) {
+      // rarity affects the bonus spread
+      const rarityBoost = { Common: 6, Uncommon: 10, Rare: 16, Epic: 22, Legendary: 30 };
+      const boost = rarityBoost[rarity] ?? 8;
+      return {
+        hp:  base.hp + rng(0, boost),
+        atk: base.atk + rng(0, boost),
+        def: base.def + rng(0, boost),
+        spd: base.spd + rng(0, boost),
+        luk: base.luk + rng(0, boost)
+      };
+    }
+
+    function createMonsterFromSpecies(speciesKey) {
+      const tmpl = SPECIES[speciesKey];
+      const id = uid();
+      const stats = rollStats(tmpl.base, tmpl.rarity);
+      return {
+        id,
+        species: speciesKey,
+        rarity: tmpl.rarity,
+        img: tmpl.img,
+        level: 1,
+        xp: 0,
+        statsMax: {...stats}, // for healing between battles
+        statsCur: {...stats},
+        caughtAt: Date.now()
+      };
+    }
+
+    // =========================
+    // CAPTURE FLOW
+    // =========================
+    async function captureAndClassify() {
+      clearError();
+      if (!webcamStream) { logError("No webcam stream available."); return; }
+
+      // Draw current video frame to canvas
+      canvasEl.width = webcamEl.videoWidth;
+      canvasEl.height = webcamEl.videoHeight;
+      ctx.drawImage(webcamEl, 0, 0, canvasEl.width, canvasEl.height);
+
+      // Stop stream to enforce one-time capture
+      stopCamera();
+
+      try {
+        const preds = await model.predict(canvasEl);
+        preds.sort((a,b) => b.probability - a.probability);
+        const top = (preds[0]?.className || "").toLowerCase().trim();
+        const conf = preds[0]?.probability || 0;
+        console.log("Top class:", top, conf);
+
+        if (!SPECIES[top]) {
+          captureResult.style.display = "block";
+          captureResult.innerHTML = `
+            <div class="kv"><div>Result</div><div>Unknown: "${top}"</div></div>
+            <p class="label">Tip: Make sure your Teachable Machine class name exactly matches a key in SPECIES (lowercase).</p>
+          `;
+          return;
+        }
+
+        const mon = createMonsterFromSpecies(top);
+        addMonster(mon); // persist
+        renderCaptureResult(mon, conf);
+
+      } catch (e) {
+        logError("Prediction failed. Ensure your model was exported for web and image size matches typical webcam frames.");
+        console.error(e);
+      }
+    }
+
+    function renderCaptureResult(mon, confidence) {
+      captureResult.style.display = "block";
+      captureResult.innerHTML = `
+        <div class="row">
+          <img src="${mon.img}" alt="${mon.species}" style="max-width:200px; border-radius:12px;">
+          <div class="stack" style="min-width:220px;">
+            <div><span class="pill">${mon.rarity}</span> <span class="pill">Lv ${mon.level}</span></div>
+            <div class="kv"><div>Species</div><div>${mon.species}</div></div>
+            <div class="kv"><div>Confidence</div><div>${(confidence*100).toFixed(1)}%</div></div>
+            <div class="kv"><div>HP</div><div>${mon.statsCur.hp}</div></div>
+            <div class="kv"><div>ATK</div><div>${mon.statsCur.atk}</div></div>
+            <div class="kv"><div>DEF</div><div>${mon.statsCur.def}</div></div>
+            <div class="kv"><div>SPD</div><div>${mon.statsCur.spd}</div></div>
+            <div class="kv"><div>LUK</div><div>${mon.statsCur.luk}</div></div>
+            <div class="row">
+              <button class="btn success" onclick="goTab('collection')">View in Collection</button>
+              <button class="btn" onclick="goTab('battle')">Try Wild Battle</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================
+    // COLLECTION & SHARDS
+    // =========================
+    function refreshCollectionView() {
+      const grid = document.getElementById("collectionGrid");
+      const col = getCollection();
+      if (!col.length) { grid.innerHTML = `<p class="label">No monsters yet — go to Capture!</p>`; return; }
+
+      grid.innerHTML = col.map(m => {
+        const inTeam = getTeam().includes(m.id);
+        return `
+          <div class="card">
+            <img src="${m.img}" alt="${m.species}" style="width:100%; max-height:140px; object-fit:contain;">
+            <div class="kv"><div>ID</div><div style="font-family:monospace;">${m.id}</div></div>
+            <div class="kv"><div>Species</div><div>${m.species}</div></div>
+            <div class="kv"><div>Rarity</div><div>${m.rarity}</div></div>
+            <div class="kv"><div>Level</div><div>${m.level} (XP ${m.xp})</div></div>
+            <div class="kv"><div>HP</div><div>${m.statsCur.hp}/${m.statsMax.hp}</div></div>
+            <div class="kv"><div>ATK</div><div>${m.statsCur.atk}</div></div>
+            <div class="kv"><div>DEF</div><div>${m.statsCur.def}</div></div>
+            <div class="kv"><div>SPD</div><div>${m.statsCur.spd}</div></div>
+            <div class="kv"><div>LUK</div><div>${m.statsCur.luk}</div></div>
+            <div class="row" style="margin-top:8px;">
+              <button class="btn" onclick="toggleTeam('${m.id}')">${inTeam ? 'Remove from Team' : 'Add to Team'}</button>
+              <button class="btn danger" onclick="breakDown('${m.id}')">Break Down</button>
+            </div>
+            ${upgradeButtonHTML(m)}
+          </div>
+        `;
+      }).join("");
+    }
+
+    function upgradeButtonHTML(m) {
+      const shards = getShards();
+      const have = shards[m.species] || 0;
+      const cost = upgradeCost(m.level);
+      const can = have >= cost;
+      return `
+        <div class="row" style="margin-top:6px;">
+          <div class="pill">Shards: ${have}/${cost}</div>
+          <button class="btn ${can ? 'success' : ''}" ${can ? '' : 'disabled'} onclick="upgradeMonster('${m.id}')">Upgrade</button>
+        </div>
+      `;
+    }
+
+    function refreshShardView() {
+      const box = document.getElementById("shardList");
+      const s = getShards();
+      const keys = Object.keys(SPECIES);
+      if (!keys.length) { box.innerHTML = "<p class='label'>No species configured.</p>"; return; }
+      box.innerHTML = keys.map(k => {
+        const have = s[k] || 0;
+        return `<div class="kv"><div>${k}</div><div>${have} shards</div></div>`;
+      }).join("");
+    }
+
+    function toggleTeam(monId) {
+      const team = getTeam();
+      const idx = team.indexOf(monId);
+      if (idx >= 0) {
+        team[idx] = null;
+        setTeam(team);
+        refreshCollectionView();
+        return;
+      }
+      // add to first free slot
+      const free = team.indexOf(null);
+      if (free === -1) { alert("Team is full. Remove one first."); return; }
+      team[free] = monId;
+      setTeam(team);
+      refreshCollectionView();
+    }
+
+    function refreshTeamView() {
+      const teamBox = document.getElementById("teamSlots");
+      const slots = Array.from(teamBox.querySelectorAll(".team-slot"));
+      const team = getTeam();
+      const col = getCollection();
+      slots.forEach((slotDiv, i) => {
+        const id = team[i];
+        if (!id) { slotDiv.textContent = "Empty"; return; }
+        const m = col.find(x => x.id === id);
+        slotDiv.innerHTML = m ? `
+          <div><strong>${m.species}</strong> — Lv ${m.level}</div>
+          <div>HP ${m.statsCur.hp}/${m.statsMax.hp} • ATK ${m.statsCur.atk} • DEF ${m.statsCur.def}</div>
+        ` : "Empty";
+      });
+
+      // also refresh selects used for battle & pvp
+      const battleSel = document.getElementById("battleMySelect");
+      const p1Sel = document.getElementById("p1Select");
+      const p2Sel = document.getElementById("p2Select");
+
+      const options = col.map(m => `<option value="${m.id}">${m.species} — Lv ${m.level} — ${m.id}</option>`).join("");
+      battleSel.innerHTML = `<option value="">Select...</option>` + options;
+      p1Sel.innerHTML = `<option value="">Select...</option>` + options;
+      p2Sel.innerHTML = `<option value="">Select...</option>` + options;
+    }
+
+    function breakDown(monId) {
+      const m = findMonster(monId);
+      if (!m) return;
+      const tmpl = SPECIES[m.species];
+      const shards = getShards();
+      shards[m.species] = (shards[m.species] || 0) + (tmpl.shardsOnBreak || 10);
+      setShards(shards);
+      removeMonsterById(monId);
+      refreshCollectionView();
+    }
+
+    function upgradeCost(level) { return 20 + (level - 1) * 10; }
+
+    function upgradeMonster(monId) {
+      const m = findMonster(monId);
+      if (!m) return;
+      const shards = getShards();
+      const cost = upgradeCost(m.level);
+      const have = shards[m.species] || 0;
+      if (have < cost) { alert("Not enough shards."); return; }
+      shards[m.species] = have - cost;
+      setShards(shards);
+
+      // increase level and stats
+      m.level += 1;
+      const inc = { hp: rng(6,12), atk: rng(3,6), def: rng(3,6), spd: rng(2,5), luk: rng(2,5) };
+      m.statsMax.hp += inc.hp; m.statsMax.atk += inc.atk; m.statsMax.def += inc.def; m.statsMax.spd += inc.spd; m.statsMax.luk += inc.luk;
+      m.statsCur = { ...m.statsMax }; // heal on upgrade
+      // persist
+      const col = getCollection().map(x => x.id === m.id ? m : x);
+      setCollection(col);
+      refreshCollectionView();
+    }
+
+    // =========================
+    // BATTLE SYSTEM (Wild & PvP)
+    // =========================
+    function calcDamage(attacker, defender, moveKey) {
+      const move = MOVES[moveKey];
+      // miss?
+      if (Math.random() > move.acc) return { dmg: 0, miss: true, name: move.name };
+      if (move.buff) {
+        attacker.statsCur.atk += move.buff.atk || 0;
+        attacker.statsCur.def += move.buff.def || 0;
+        return { dmg: 0, buff: move.buff, name: move.name };
+      }
+      const atk = attacker.statsCur.atk;
+      const def = defender.statsCur.def;
+      const base = Math.max(1, Math.round(atk * move.power - def * 0.3));
+      const variance = rng(-3, 3);
+      const crit = Math.random() < Math.min(0.35, 0.05 + attacker.statsCur.luk/100) ? 1.5 : 1;
+      const dmg = Math.max(1, Math.round((base + variance) * crit));
+      defender.statsCur.hp = Math.max(0, defender.statsCur.hp - dmg);
+      return { dmg, crit: crit>1, name: move.name };
+    }
+
+    function monsterCopy(m) { return JSON.parse(JSON.stringify(m)); }
+    function healFull(m) { m.statsCur = { ...m.statsMax }; return m; }
+
+    // --- Wild Battle ---
+    document.getElementById("btnStartWild").addEventListener("click", () => {
+      const id = document.getElementById("battleMySelect").value;
+      const my = findMonster(id);
+      if (!my) { alert("Pick your fighter."); return; }
+
+      // enemy spawns around your level (+/-1)
+      const keys = Object.keys(SPECIES);
+      const sp = keys[rng(0, keys.length-1)];
+      const enemy = createMonsterFromSpecies(sp);
+      enemy.level = Math.max(1, my.level + rng(-1, 1));
+      // scale enemy slightly with level
+      enemy.statsMax.hp += enemy.level * 4; enemy.statsMax.atk += enemy.level * 2; enemy.statsMax.def += enemy.level * 2;
+      enemy.statsCur = { ...enemy.statsMax };
+
+      runBattle("battleArea", monsterCopy(healFull(my)), enemy, (result) => {
+        // On battle end, award XP or shards
+        if (result === "win") {
+          const inc = rng(8, 16);
+          my.xp += inc;
+          // level up when XP >= 100
+          while (my.xp >= 100) {
+            my.xp -= 100;
+            my.level += 1;
+            my.statsMax.hp += rng(6,10);
+            my.statsMax.atk += rng(3,6);
+            my.statsMax.def += rng(3,6);
+            my.statsMax.spd += rng(2,5);
+            my.statsMax.luk += rng(1,4);
+          }
+          my.statsCur = { ...my.statsMax }; // heal after wild fight
+          const col = getCollection().map(x => x.id === my.id ? my : x);
+          setCollection(col);
+          alert(`You won! +${inc} XP to ${my.species}.`);
+        } else if (result === "lose") {
+          const shards = getShards();
+          shards[enemy.species] = (shards[enemy.species]||0) + 4; // consolation shards
+          setShards(shards);
+          alert("You lost. Earned a few shards anyway.");
+        } else {
+          // draw
+          alert("It’s a draw!");
+        }
+      });
+    });
+
+    // --- Local PvP (same device) ---
+    document.getElementById("btnStartPVP").addEventListener("click", () => {
+      const p1 = findMonster(document.getElementById("p1Select").value);
+      const p2 = findMonster(document.getElementById("p2Select").value);
+      if (!p1 || !p2) { alert("Select both Player 1 and Player 2 monsters."); return; }
+      runBattle("pvpArea", monsterCopy(healFull(p1)), monsterCopy(healFull(p2)), (result) => {
+        alert(result === "win" ? "Player 1 wins!" : result === "lose" ? "Player 2 wins!" : "Draw!");
+      }, true);
+    });
+
+    function runBattle(containerId, Aorig, Borig, onEnd, pvp=false) {
+      const A = Aorig, B = Borig;
+      const el = document.getElementById(containerId);
+      let turn = 1; // odd -> A, even -> B
+      el.innerHTML = renderBattleUI(A,B, turn, pvp);
+
+      function refresh() { el.innerHTML = renderBattleUI(A,B, turn, pvp); attachMoveHandlers(); }
+
+      function attachMoveHandlers() {
+        const myMoves = el.querySelectorAll("[data-move]");
+        myMoves.forEach(btn => btn.addEventListener("click", () => {
+          const mkey = btn.getAttribute("data-move");
+          stepTurn(mkey);
+        }));
+      }
+
+      function stepTurn(moveKey) {
+        const attacker = (turn % 2 === 1) ? A : B;
+        const defender = (turn % 2 === 1) ? B : A;
+
+        let log = el.querySelector(".log");
+        // attacker acts
+        const res = calcDamage(attacker, defender, moveKey);
+        log.textContent += `${attacker.species} used ${res.name}! `;
+        if (res.miss) log.textContent += "It missed.\n";
+        else if (res.buff) log.textContent += `Buffed! (+ATK ${res.buff.atk||0}, +DEF ${res.buff.def||0})\n`;
+        else {
+          if (res.crit) log.textContent += "Critical hit! ";
+          log.textContent += `Dealt ${res.dmg} damage.\n`;
+        }
+
+        // check KO
+        if (defender.statsCur.hp <= 0 && attacker.statsCur.hp <= 0) { onEnd?.("draw"); refresh(); return; }
+        if (defender.statsCur.hp <= 0) { onEnd?.(turn % 2 === 1 ? "win" : "lose"); refresh(); return; }
+
+        turn += 1; // next player
+        refresh();
+      }
+
+      attachMoveHandlers();
+    }
+
+    function renderBattleUI(A,B, turn, pvp) {
+      const myTurn = (turn % 2 === 1) ? "A" : "B";
+      const who = myTurn === "A" ? A : B;
+      const title = pvp ? (myTurn === "A" ? "Player 1 turn" : "Player 2 turn") : (myTurn === "A" ? "Your turn" : "Enemy turn");
+
+      return `
+        <div class="row">
+          <div class="card" style="flex:1;">
+            <div class="section-title">${A.species} (Lv ${A.level})</div>
+            <img src="${A.img}" alt="${A.species}" style="max-height:120px; object-fit:contain;">
+            <div class="kv"><div>HP</div><div>${A.statsCur.hp}/${A.statsMax.hp}</div></div>
+            <div class="kv"><div>ATK</div><div>${A.statsCur.atk}</div></div>
+            <div class="kv"><div>DEF</div><div>${A.statsCur.def}</div></div>
+          </div>
+          <div class="card" style="flex:1;">
+            <div class="section-title">${B.species} (Lv ${B.level})</div>
+            <img src="${B.img}" alt="${B.species}" style="max-height:120px; object-fit:contain;">
+            <div class="kv"><div>HP</div><div>${B.statsCur.hp}/${B.statsMax.hp}</div></div>
+            <div class="kv"><div>ATK</div><div>${B.statsCur.atk}</div></div>
+            <div class="kv"><div>DEF</div><div>${B.statsCur.def}</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">${title}</div>
+          <div class="moves">
+            ${myTurn === "A" || pvp ? `
+              <button class="btn" data-move="quick">${MOVES.quick.name}</button>
+              <button class="btn" data-move="heavy">${MOVES.heavy.name}</button>
+              <button class="btn" data-move="focus">${MOVES.focus.name}</button>
+            ` : `<em class="label">Waiting for opponent...</em>`}
+          </div>
+          <div class="log" style="margin-top:8px;"></div>
+        </div>
+      `;
+    }
+
+    // =========================
+    // TABS
+    // =========================
+    function goTab(name) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
+      // small UX extras
+      if (name === "capture") {
+        btnCapture.disabled = false;
+        btnRetake.style.display = "none";
+        captureResult.style.display = "none";
+        startCamera();
+      } else {
+        stopCamera();
+      }
+    }
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => goTab(btn.dataset.tab));
+    });
+
+    // =========================
+    // INIT + BUTTONS
+    // =========================
+    btnCapture.addEventListener("click", async () => {
+      btnCapture.disabled = true;
+      await captureAndClassify();         // one-time capture
+      btnRetake.style.display = "inline-block";
+    });
+
+    btnRetake.addEventListener("click", async () => {
+      captureResult.style.display = "none";
+      btnRetake.style.display = "none";
+      btnCapture.disabled = false;
+      await startCamera();                // restart camera for a new capture
+    });
+
+    async function init() {
+      try {
+        await loadModel();                // load TM model
+        await startCamera();              // start camera on Capture tab
+        refreshAllViews();                // draw UI from localStorage
+      } catch (e) {
+        console.warn("Init warning:", e);
+      }
+    }
+
+    function refreshAllViews() {
+      refreshCollectionView();
+      refreshTeamView();
+      refreshShardView();
+    }
+
+    // Kick off
+    init();
+  </script>
+</body>
+</html>
