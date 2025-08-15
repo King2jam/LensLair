@@ -1,1149 +1,594 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Monster Transform Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <style>
-    :root { color-scheme: dark; }
-    body { margin:0; font-family: system-ui, Arial, sans-serif; background:#111; color:#f3f3f3; }
-    header { padding:16px; text-align:center; background:linear-gradient(180deg,#1b1b1b,#151515); position:sticky; top:0; z-index:10; }
-    h1 { margin:0 0 6px; font-size:22px; }
-    p.sub { margin:0; opacity:0.8; font-size:14px; }
-    main { max-width:960px; margin: 0 auto; padding: 14px; }
-    .card { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:12px; padding:12px; margin:12px 0; }
-    video, canvas, img.preview { width:100%; max-height:60vh; object-fit:cover; border-radius:12px; background:#000; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; }
-    .row > * { flex:1 1 200px; }
-    button, .btn {
-      background:#2c7be5; border:none; color:#fff; padding:12px 14px; border-radius:10px; font-size:16px; cursor:pointer;
-      display:inline-flex; align-items:center; justify-content:center; gap:8px;
-    }
-    button:disabled { opacity:0.5; cursor:not-allowed; }
-    .btn-secondary { background:#444; }
-    .btn-danger { background:#c0392b; }
-    .hint { font-size:13px; opacity:0.8; margin-top:6px; }
-    .error { background:#4a0f0f; border:1px solid #8a2b2b; padding:10px; border-radius:10px; margin:10px 0; display:none; }
-    .ok { color:#90ee90; }
-    .split { display:grid; grid-template-columns: 1fr; gap:12px; }
-    @media (min-width: 900px) { .split { grid-template-columns: 1.2fr 0.8fr; } }
-    .monster-card img { width:100%; border-radius:12px; background:#000; }
-    .statline { display:grid; grid-template-columns: 1fr 1fr; gap:6px; font-size:14px; }
-    .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#2e2e2e; font-size:12px; }
-    .small { font-size:12px; opacity:0.9; }
-    .flex { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .list { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:10px; }
-    .tile { background:#191919; border:1px solid #2a2a2a; padding:10px; border-radius:10px; }
-    .tile img { width:100%; height:100px; object-fit:cover; border-radius:8px; }
-    .muted { opacity:0.7; }
-    .divider { height:1px; background:#2a2a2a; margin:10px 0; }
-    .pill { background:#2a2a2a; padding:4px 8px; border-radius:999px; font-size:12px; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Monster Transform Game</title>
+
+<!-- ====== Styles ====== -->
+<style>
+  :root{
+    --bg:#121212; --panel:#1b1b1b; --ink:#f5f5f5; --muted:#9aa0a6;
+    --brand:#4f8cff; --ok:#17c964; --warn:#ffb020; --bad:#ef4444;
+    --chip:#2a2a2a; --card:#202225; --border:#2c2c2c;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  }
+  .app{max-width:1100px; margin:0 auto; padding:16px}
+  h1{font-size:24px; margin:4px 0 12px}
+  .subtitle{color:var(--muted); margin-bottom:12px}
+
+  .layout{display:grid; grid-template-columns:1.1fr .9fr; gap:16px}
+  @media (max-width:900px){ .layout{grid-template-columns:1fr} }
+
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px}
+
+  .video-wrap{position:relative; background:#000; border-radius:12px; overflow:hidden; border:1px solid var(--border)}
+  video{width:100%; height:320px; object-fit:cover; background:#000}
+  .controls{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap}
+  button{
+    background:#2b2b2b; border:1px solid var(--border); color:var(--ink);
+    padding:10px 14px; border-radius:12px; font-weight:600; cursor:pointer;
+  }
+  button.primary{background:var(--brand); border-color:transparent}
+  button.ghost{background:transparent}
+  button:disabled{opacity:.6; cursor:not-allowed}
+
+  .error, .note{
+    padding:10px 12px; border-radius:12px; margin-bottom:10px; white-space:pre-wrap
+  }
+  .error{background:#3a0d0d; border:1px solid #5c1515}
+  .note{background:#102138; border:1px solid #1d3357; color:#cfe1ff}
+
+  /* Right column */
+  .statline{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px}
+  .chip{background:var(--chip); border:1px solid var(--border); color:var(--muted); padding:4px 8px; border-radius:999px; font-size:12px}
+
+  .team{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+  .team-slot{
+    min-height:80px; background:var(--card); border:1px dashed #3a3a3a; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; padding:8px; text-align:center
+  }
+  .team-slot.filled{border-style:solid}
+  .small{font-size:12px; color:var(--muted)}
+
+  .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; margin-top:10px}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden
+  }
+  .card-head{display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border)}
+  .rarity{padding:2px 6px; border-radius:999px; font-size:11px; border:1px solid var(--border); color:#ddd}
+  .rarity.rare{background:#2b2142; border-color:#4b3780}
+  .imgbox{background:#0b0b0b; height:140px; display:flex; align-items:center; justify-content:center}
+  .imgbox img{max-width:100%; max-height:100%}
+  .pad{padding:10px 12px}
+  .kv{display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px 10px; font-size:13px}
+  .act{display:flex; gap:8px; margin-top:8px}
+
+  /* Footer nav (demo buttons) */
+  .footer{display:flex; gap:10px; justify-content:center; padding:16px 0}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Monster Transform Game</h1>
-    <p class="sub">Take a picture of a real creature and see its monster form!</p>
-  </header>
+<div class="app">
+  <h1>Monster Transform Game</h1>
+  <div class="subtitle">Take a picture of a real creature and see its monster form!</div>
 
-  <main class="split">
-    <!-- LEFT: Camera & Result -->
-    <section class="card">
-      <div id="errorBox" class="error"></div>
+  <div id="httpsWarn" class="note" style="display:none">
+    For mobile cameras you must be on <b>HTTPS</b> (e.g., GitHub Pages). iOS requires a user tap to start the camera.
+  </div>
 
-      <div id="cameraBlock">
-        <video id="webcam" playsinline muted autoplay></video>
-        <div class="row" style="margin-top:10px;">
-          <button id="enableCamBtn">📷 Enable Camera</button>
-          <button id="captureBtn" disabled>📸 Capture Photo</button>
-          <label class="btn btn-secondary" for="fileInput">🖼️ Upload Photo</label>
-          <input id="fileInput" type="file" accept="image/*" capture="environment" style="display:none;">
-        </div>
-        <div class="hint">
-          If camera doesn’t start on mobile, make sure you’re on <span class="pill">HTTPS</span> (e.g., GitHub Pages).  
-          iOS requires a tap to start the camera—use “Enable Camera”.
-        </div>
+  <div class="layout">
+    <!-- ===== Left: Capture / Predict ===== -->
+    <div class="panel">
+      <div id="log" class="error" style="display:none">No prediction result.</div>
+
+      <div class="video-wrap">
+        <video id="webcam" playsinline muted></video>
       </div>
 
-      <canvas id="captureCanvas" style="display:none;"></canvas>
-
-      <div id="result" class="card" style="display:none; margin-top:12px;"></div>
-    </section>
-
-    <!-- RIGHT: Collection / Team / Resources -->
-    <section class="card">
-      <h3>Your Collection</h3>
-      <div class="flex">
-        <span class="pill" id="dustPill">Upgrade Dust: 0</span>
-        <span class="pill" id="teamCountPill">Team: 0/3</span>
+      <div class="controls">
+        <button id="btnEnable" class="primary">📷 Enable Camera</button>
+        <button id="btnCapture">🧪 Capture Photo</button>
+        <label class="ghost">
+          <input id="fileInput" type="file" accept="image/*" hidden />
+          ⬆️ Upload Photo
+        </label>
+        <button id="btnStop" class="ghost">✖ Stop Camera</button>
       </div>
-      <div id="collectionList" class="list" style="margin-top:10px;"></div>
-      <div class="divider"></div>
-      <h3>Team</h3>
-      <div id="teamList" class="list"></div>
-    </section>
-  </main>
 
-  <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
-
-  <script>
-  // =========================
-  // CONFIG & MONSTER CATALOG
-  // =========================
-  const MODEL_DIR = "model_real/"; // <-- Your TM model folder
-  const monsterData = {
-    // Make sure files exist in /digital_images/ with these exact names or change them here.
-    ladybug:  { name:"Ladybug",  image:"digital_images/ladybug.png",  element:"Nature", type:"Tank",     base:{hp:60, atk:45, def:60, spd:35, crit:8}},
-    squirrel: { name:"Squirrel", image:"digital_images/squirrel.png", element:"Wind",   type:"Rogue",    base:{hp:55, atk:50, def:45, spd:70, crit:12}},
-    dog:      { name:"Dog",      image:"digital_images/dog.png",      element:"Earth",  type:"Brawler",  base:{hp:65, atk:60, def:55, spd:45, crit:10}},
-    cat:      { name:"Cat",      image:"digital_images/cat.png",      element:"Solar",  type:"Assassin", base:{hp:50, atk:65, def:40, spd:75, crit:15}},
-    spider:   { name:"Spider",   image:"digital_images/spider.png",   element:"Shadow", type:"Trapper",  base:{hp:58, atk:52, def:50, spd:55, crit:11}},
-    fly:      { name:"Fly",      image:"digital_images/fly.png",      element:"Air",    type:"Scout",    base:{hp:45, atk:35, def:30, spd:90, crit:9}},
-  };
-
-  // Rarity weights (adjust later)
-  const rarities = [
-    { key:"Common",    mult:1.00, weight:60 },
-    { key:"Uncommon",  mult:1.10, weight:25 },
-    { key:"Rare",      mult:1.25, weight:10 },
-    { key:"Epic",      mult:1.45, weight:4  },
-    { key:"Legendary", mult:1.70, weight:1  },
-  ];
-
-  // =========================
-  // STATE & STORAGE HELPERS
-  // =========================
-  const LS_KEYS = {
-    collection: "mx_collection_v1",
-    team: "mx_team_v1",
-    dust: "mx_dust_v1",
-    favorite: "mx_favorite_v1",
-  };
-
-  function loadLS(key, fallback) {
-    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-    catch { return fallback; }
-  }
-  function saveLS(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
-
-  let collection = loadLS(LS_KEYS.collection, []); // array of monsters
-  let team = loadLS(LS_KEYS.team, []);             // array of monster ids (max 3)
-  let dust = loadLS(LS_KEYS.dust, 0);
-  let favoriteId = loadLS(LS_KEYS.favorite, null);
-
-  function uid() { return "m_" + Math.random().toString(36).slice(2) + Date.now().toString(36); }
-
-  function weightedPick(weights) {
-    const total = weights.reduce((a,b)=>a+b,0);
-    let r = Math.random()*total;
-    for (let i=0;i<weights.length;i++){ if (r < weights[i]) return i; r -= weights[i]; }
-    return weights.length-1;
-  }
-
-  // =========================
-  // MODEL & CAMERA
-  // =========================
-  let model = null;
-  let stream = null;
-  const webcam = document.getElementById("webcam");
-  const enableCamBtn = document.getElementById("enableCamBtn");
-  const captureBtn = document.getElementById("captureBtn");
-  const fileInput = document.getElementById("fileInput");
-  const errorBox = document.getElementById("errorBox");
-  const resultBox = document.getElementById("result");
-  const captureCanvas = document.getElementById("captureCanvas");
-
-  function showError(msg) {
-    errorBox.style.display = "block";
-    errorBox.textContent = msg;
-    console.error(msg);
-  }
-  function clearError() {
-    errorBox.style.display = "none";
-    errorBox.textContent = "";
-  }
-
-  async function loadModel() {
-    try {
-      // quick presence checks (helps debug bad paths)
-      for (const f of ["model.json","metadata.json","weights.bin"]) {
-        const r = await fetch(MODEL_DIR + f, { cache: "no-store" });
-        if (!r.ok) throw new Error(`Model file missing or blocked: ${f} (HTTP ${r.status})`);
-      }
-      model = await tmImage.load(MODEL_DIR + "model.json", MODEL_DIR + "metadata.json");
-      console.log("✅ Model loaded");
-    } catch (err) {
-      showError("Failed to load model. Verify /model_real/ contains model.json, metadata.json, weights.bin and paths are correct. " + err.message);
-      throw err;
-    }
-  }
-
-  async function startCamera() {
-    clearError();
-    // HTTPS check (mobile browsers require secure origin for camera)
-    const isLocalhost = location.hostname === "localhost" || location.hostname === "127.0.0.1";
-    const isHttps = location.protocol === "https:";
-    if (!isHttps && !isLocalhost) {
-      showError("Camera requires HTTPS on mobile. Please host this on GitHub Pages (https) or run on http://localhost during development.");
-      return;
-    }
-    try {
-      // Prefer rear camera; browsers may ignore facingMode but it helps.
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 }, height: { ideal: 720 }
-        },
-        audio: false
-      });
-      webcam.srcObject = stream;
-      // iOS needs a play() after setting srcObject
-      await webcam.play().catch(()=>{});
-      captureBtn.disabled = false;
-      console.log("✅ Camera started");
-    } catch (err) {
-      showError(`Could not start camera: ${err.name} — ${err.message}`);
-      console.error(err);
-    }
-  }
-
-  enableCamBtn.addEventListener("click", startCamera);
-
-  // =========================
-  // CAPTURE & PREDICT
-  // =========================
-  function drawToCanvasFromVideo() {
-    const v = webcam;
-    const c = captureCanvas;
-    const w = v.videoWidth || 640;
-    const h = v.videoHeight || 480;
-    c.width = w; c.height = h;
-    const ctx = c.getContext("2d");
-    ctx.drawImage(v, 0, 0, w, h);
-    return c;
-  }
-
-  function drawToCanvasFromImage(imgEl) {
-    const c = captureCanvas;
-    c.width = imgEl.naturalWidth || imgEl.width;
-    c.height = imgEl.naturalHeight || imgEl.height;
-    const ctx = c.getContext("2d");
-    ctx.drawImage(imgEl, 0, 0, c.width, c.height);
-    return c;
-  }
-
-  async function predictFromCanvas(canvas) {
-    if (!model) {
-      showError("Model not loaded yet.");
-      return null;
-    }
-    const preds = await model.predict(canvas);
-    preds.sort((a,b)=> b.probability - a.probability);
-    return preds[0]; // top-1
-  }
-
-  captureBtn.addEventListener("click", async () => {
-    try {
-      clearError();
-      const snap = drawToCanvasFromVideo();
-      await handlePredictionCanvas(snap);
-    } catch (err) {
-      showError("Capture failed: " + err.message);
-    }
-  });
-
-  fileInput.addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = async () => {
-      const snap = drawToCanvasFromImage(img);
-      await handlePredictionCanvas(snap);
-    };
-    img.onerror = () => showError("Could not load image file.");
-    img.src = URL.createObjectURL(file);
-  });
-
-  async function handlePredictionCanvas(canvas) {
-    const top = await predictFromCanvas(canvas);
-    if (!top) { showError("No prediction result."); return; }
-
-    const label = (top.className || "").toLowerCase().trim();
-    const match = monsterData[label];
-    if (!match) {
-      resultBox.style.display = "block";
-      resultBox.innerHTML = `<div>Predicted: <b>${top.className}</b> (${(top.probability*100).toFixed(1)}%).<br>
-      No matching monster art found for label “${label}”. Add an entry in <code>monsterData</code> or the image file in <code>/digital_images/</code>.</div>`;
-      return;
-    }
-
-    // Roll rarity & build stats
-    const idx = weightedPick(rarities.map(r=>r.weight));
-    const rarity = rarities[idx];
-    const b = match.base;
-    // Some variation
-    const roll = () => (Math.random()*6 - 3); // -3..+3
-    const stats = {
-      hp:   Math.max(1, Math.round((b.hp   + roll()) * rarity.mult)),
-      atk:  Math.max(1, Math.round((b.atk  + roll()) * rarity.mult)),
-      def:  Math.max(1, Math.round((b.def  + roll()) * rarity.mult)),
-      spd:  Math.max(1, Math.round((b.spd  + roll()) * rarity.mult)),
-      crit: Math.min(50, Math.max(1, Math.round((b.crit + Math.random()*2) * rarity.mult)))
-    };
-
-    // Create monster instance
-    const id = uid();
-    const captured = {
-      id,
-      key: label,
-      name: match.name,
-      element: match.element,
-      type: match.type,
-      rarity: rarity.key,
-      image: match.image,
-      stats,
-      level: 1,
-      xp: 0,
-      createdAt: Date.now(),
-      favorite: false
-    };
-
-    // Save to collection
-    collection.unshift(captured);
-    saveLS(LS_KEYS.collection, collection);
-    renderCollection();
-    renderTeam();
-    renderDust();
-
-    // Show card
-    showMonsterCard(captured, (top.probability*100).toFixed(1));
-  }
-
-  function showMonsterCard(mon, probStr) {
-    resultBox.style.display = "block";
-    const favBadge = (favoriteId === mon.id) ? `<span class="badge">Favorite</span>` : "";
-    resultBox.innerHTML = `
-      <div class="monster-card">
-        <div class="flex" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <div><span class="badge">${mon.element}</span> <span class="badge">${mon.type}</span> <span class="badge">${mon.rarity}</span></div>
-          <div class="small muted">Confidence: ${probStr}%</div>
-        </div>
-        <img src="${mon.image}" alt="${mon.name}" onerror="this.src=''; this.outerHTML='<div class=&quot;muted&quot;>Image not found: ${mon.image}</div>';">
-        <h2 style="margin:8px 0 6px;">${mon.name} ${favBadge}</h2>
-        <div class="statline">
-          <div>HP: <b>${mon.stats.hp}</b></div>
-          <div>ATK: <b>${mon.stats.atk}</b></div>
-          <div>DEF: <b>${mon.stats.def}</b></div>
-          <div>SPD: <b>${mon.stats.spd}</b></div>
-          <div>CRIT%: <b>${mon.stats.crit}</b></div>
-          <div>LVL: <b>${mon.level}</b></div>
-        </div>
-        <div class="row" style="margin-top:10px;">
-          <button class="btn-secondary" onclick="addToTeam('${mon.id}')">➕ Add to Team</button>
-          <button class="btn-secondary" onclick="toggleFavorite('${mon.id}')">⭐ Favorite</button>
-          <button class="btn-danger" onclick="breakdown('${mon.id}')">🧪 Breakdown</button>
-        </div>
-        <div class="hint">Camera stays active—you can capture again anytime.</div>
+      <div class="note small">
+        Tip: On iOS, if the camera doesn’t appear, tap <b>Enable Camera</b> once more.  
+        You can also test with <b>Upload Photo</b>.
       </div>
-    `;
-  }
-
-  // =========================
-  // COLLECTION / TEAM / DUST
-  // =========================
-  function renderCollection() {
-    const list = document.getElementById("collectionList");
-    if (!collection.length) {
-      list.innerHTML = `<div class="muted">No monsters captured yet.</div>`;
-      return;
-    }
-    list.innerHTML = collection.map(m => `
-      <div class="tile">
-        <img src="${m.image}" alt="${m.name}" onerror="this.style.display='none';">
-        <div style="margin-top:6px; font-weight:600;">${m.name}</div>
-        <div class="small muted">${m.element} • ${m.type} • ${m.rarity}</div>
-        <div class="small">LVL ${m.level} — HP ${m.stats.hp}</div>
-        <div class="row" style="margin-top:8px;">
-          <button class="btn-secondary" onclick="addToTeam('${m.id}')">Team</button>
-          <button class="btn-secondary" onclick="toggleFavorite('${m.id}')">${favoriteId===m.id?'Unfavorite':'Favorite'}</button>
-          <button class="btn-danger" onclick="breakdown('${m.id}')">Breakdown</button>
-        </div>
-      </div>
-    `).join("");
-  }
-
-  function renderTeam() {
-    const area = document.getElementById("teamList");
-    const members = team.map(id => collection.find(m => m.id===id)).filter(Boolean);
-    document.getElementById("teamCountPill").textContent = `Team: ${members.length}/3`;
-    if (!members.length) {
-      area.innerHTML = `<div class="muted">No team members yet (max 3).</div>`;
-      return;
-    }
-    area.innerHTML = members.map(m => `
-      <div class="tile">
-        <img src="${m.image}" alt="${m.name}">
-        <div style="margin-top:6px; font-weight:600;">${m.name}</div>
-        <div class="small muted">${m.element} • ${m.type} • ${m.rarity}</div>
-        <div class="small">HP ${m.stats.hp} • ATK ${m.stats.atk}</div>
-        <button class="btn-danger" style="margin-top:8px;" onclick="removeFromTeam('${m.id}')">Remove</button>
-      </div>
-    `).join("");
-  }
-
-  function renderDust() {
-    document.getElementById("dustPill").textContent = `Upgrade Dust: ${dust}`;
-  }
-
-  window.addToTeam = function(id) {
-    if (!team.includes(id)) {
-      if (team.length >= 3) { showError("Team is full (max 3). Remove someone first."); return; }
-      team.push(id);
-      saveLS(LS_KEYS.team, team);
-      renderTeam();
-      clearError();
-    }
-  }
-
-  window.removeFromTeam = function(id) {
-    team = team.filter(x => x !== id);
-    saveLS(LS_KEYS.team, team);
-    renderTeam();
-  }
-
-  window.toggleFavorite = function(id) {
-    favoriteId = (favoriteId === id) ? null : id;
-    saveLS(LS_KEYS.favorite, favoriteId);
-    renderCollection();
-    // update live card if showing same monster
-    const mon = collection.find(m=>m.id===id);
-    if (mon) showMonsterCard(mon, "--");
-  }
-
-  window.breakdown = function(id) {
-    // Convert a duplicate into dust (rarity affects yield)
-    const idx = collection.findIndex(m => m.id===id);
-    if (idx === -1) return;
-    const m = collection[idx];
-    const rarityYield = { Common:10, Uncommon:20, Rare:40, Epic:80, Legendary:150 };
-    dust += (rarityYield[m.rarity] || 10);
-    collection.splice(idx,1);
-    // also remove from team if present
-    team = team.filter(x=>x!==id);
-    saveLS(LS_KEYS.collection, collection);
-    saveLS(LS_KEYS.team, team);
-    saveLS(LS_KEYS.dust, dust);
-    renderDust();
-    renderCollection();
-    renderTeam();
-  }
-
-  // =========================
-  // INIT
-  // =========================
-  (async function bootstrap(){
-    try {
-      await loadModel();
-    } catch {
-      // model failed — keep UI but user can still upload image to see error feedback
-    }
-    renderCollection(); renderTeam(); renderDust();
-  })();
-  </script>
-</body>
-</html>
-    .stack { display:flex; flex-direction:column; gap:8px; }
-    .moves { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
-    .log { white-space:pre-wrap; background:#0f0f0f; border:1px solid #2a2a2a; border-radius:10px; padding:8px; min-height:80px; }
-    .team-slot { padding:6px; border:1px dashed #3a3a3a; border-radius:12px; min-height:60px; text-align:center; }
-  </style>
-
-  <!-- TFJS + Teachable Machine -->
-  <!-- [A1] If you must pin versions, use these two script tags. -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
-</head>
-<body>
-  <header>
-    <h1>Monster Transform Game</h1>
-    <div id="tabs">
-      <button class="tab-btn active" data-tab="capture">Capture</button>
-      <button class="tab-btn" data-tab="collection">Collection</button>
-      <button class="tab-btn" data-tab="team">Team</button>
-      <button class="tab-btn" data-tab="battle">Wild Battle</button>
-      <button class="tab-btn" data-tab="pvp">Local PvP</button>
     </div>
-  </header>
 
-  <main>
-    <div id="errorLog"></div>
-
-    <!-- CAPTURE PANEL -->
-    <section id="panel-capture" class="panel active">
-      <p>Take a picture of an animal to see its monster form!</p>
-      <div class="stack">
-        <video id="webcam" autoplay playsinline muted></video>
-        <canvas id="canvas" style="display:none;"></canvas>
-        <div class="row">
-          <button id="btnCapture" class="btn primary">📸 Capture Photo</button>
-          <button id="btnRetake" class="btn" style="display:none;">🔁 Retake</button>
-        </div>
-        <div id="captureResult" class="card" style="display:none;"></div>
+    <!-- ===== Right: Collection / Team ===== -->
+    <div class="panel">
+      <div class="statline">
+        <div class="chip">Upgrade Dust: <span id="dust">0</span></div>
+        <div class="chip">Team: <span id="teamCount">0</span>/3</div>
+        <div class="chip">Favorite: <span id="favName">None</span></div>
       </div>
-    </section>
 
-    <!-- COLLECTION PANEL -->
-    <section id="panel-collection" class="panel">
-      <div class="row-split">
-        <div>
-          <div class="section-title">Your Monsters</div>
-          <div id="collectionGrid" class="grid"></div>
-        </div>
-        <div>
-          <div class="section-title">Shards</div>
-          <div id="shardList" class="card"></div>
-        </div>
-      </div>
-    </section>
+      <h3 style="margin:8px 0 6px">Team</h3>
+      <div id="team" class="team"></div>
 
-    <!-- TEAM PANEL -->
-    <section id="panel-team" class="panel">
-      <div class="section-title">Team (3 slots)</div>
-      <div id="teamSlots" class="row">
-        <div class="team-slot" data-slot="0">Empty</div>
-        <div class="team-slot" data-slot="1">Empty</div>
-        <div class="team-slot" data-slot="2">Empty</div>
-      </div>
-      <p class="label" style="margin-top:8px;">Tip: Add/remove monsters to your team from the Collection panel.</p>
-    </section>
+      <h3 style="margin:12px 0 6px">Your Collection</h3>
+      <div id="collection" class="cards"></div>
+    </div>
+  </div>
 
-    <!-- WILD BATTLE PANEL -->
-    <section id="panel-battle" class="panel">
-      <div class="row-split">
-        <div class="card">
-          <div class="section-title">Choose Your Fighter</div>
-          <select id="battleMySelect" class="btn" style="width:100%;"></select>
-          <button id="btnStartWild" class="btn primary" style="margin-top:8px;">Start Wild Battle</button>
-        </div>
-        <div class="card">
-          <div class="section-title">Battle</div>
-          <div id="battleArea" class="stack"></div>
-        </div>
-      </div>
-    </section>
+  <div class="footer">
+    <button id="navCapture" class="primary">Capture</button>
+    <button id="navCollection">Collection</button>
+    <button id="navTeam">Team</button>
+    <button id="navWild">Wild Battle</button>
+    <button id="navPvp" disabled>Local PvP (soon)</button>
+  </div>
+</div>
 
-    <!-- LOCAL PVP PANEL -->
-    <section id="panel-pvp" class="panel">
-      <div class="row-split">
-        <div class="card">
-          <div class="section-title">Pick Monsters</div>
-          <label class="label">Player 1</label>
-          <select id="p1Select" class="btn" style="width:100%;"></select>
-          <label class="label" style="margin-top:8px;">Player 2</label>
-          <select id="p2Select" class="btn" style="width:100%;"></select>
-          <button id="btnStartPVP" class="btn primary" style="margin-top:8px;">Start PvP Match</button>
-        </div>
-        <div class="card">
-          <div class="section-title">PvP Battle</div>
-          <div id="pvpArea" class="stack"></div>
-        </div>
-      </div>
-    </section>
-  </main>
+<!-- ====== Libraries ====== -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
 
-  <script>
-    // =========================
-    // CONFIG & CONSTANTS
-    // =========================
+<!-- ====== Game Script ====== -->
+<script>
+/* -------------------------------------------------------------------------- */
+/*  Configuration & Data                                                     */
+/* -------------------------------------------------------------------------- */
 
-    // [B1] TODO: If you rename your model folder, change this:
-    const MODEL_PATH = "model_real/";  // e.g., "model_real/"
-    const DIGITAL_DIR = "digital_images/"; // [B2] Your monster art folder
+// Model + assets
+const MODEL_URL = "model_real/";
+const IMG_DIR   = "digital_images/";
 
-    // [B3] Class -> species template mapping.
-    // Keys MUST match your Teachable Machine classNames (lowercase recommended).
-    const SPECIES = {
-      ladybug:  { img: DIGITAL_DIR + "ladybug.png",  base: {hp:60, atk:25, def:20, spd:30, luk:20}, rarity:"Common", shardsOnBreak: 10 },
-      squirrel: { img: DIGITAL_DIR + "squirrel.png", base: {hp:70, atk:22, def:18, spd:35, luk:22}, rarity:"Common", shardsOnBreak: 10 },
-      dog:      { img: DIGITAL_DIR + "dog.png",      base: {hp:75, atk:28, def:24, spd:28, luk:18}, rarity:"Uncommon", shardsOnBreak: 12 },
-      cat:      { img: DIGITAL_DIR + "cat.png",      base: {hp:65, atk:30, def:20, spd:36, luk:24}, rarity:"Uncommon", shardsOnBreak: 12 },
-      spider:   { img: DIGITAL_DIR + "spider.png",   base: {hp:55, atk:26, def:18, spd:40, luk:28}, rarity:"Rare",    shardsOnBreak: 16 },
-      fly:      { img: DIGITAL_DIR + "fly.png",      base: {hp:50, atk:20, def:15, spd:44, luk:26}, rarity:"Rare",    shardsOnBreak: 16 }
-    };
+// Your current labels (must match Teachable Machine classes)
+const MONSTER_BOOK = {
+  dog:      { name:"Dog",      element:"earth",  archetype:"guardian" , img:"dog"      },
+  cat:      { name:"Cat",      element:"shadow", archetype:"assassin" , img:"cat"      },
+  squirrel: { name:"Squirrel", element:"nature", archetype:"skirmish" , img:"squirrel" },
+  fly:      { name:"Fly",      element:"air",    archetype:"plague"   , img:"fly"      },
+  spider:   { name:"Spider",   element:"poison", archetype:"control"  , img:"spider"   },
+  ladybug:  { name:"Ladybug",  element:"light",  archetype:"paladin"  , img:"ladybug"  },
+};
 
-    // Move set (kept simple & kid-friendly)
-    const MOVES = {
-      quick:   { name:"Quick Jab", power: 0.9, acc: 0.95 },
-      heavy:   { name:"Heavy Strike", power: 1.25, acc: 0.80 },
-      focus:   { name:"Focus Up", power: 0.0, acc: 1.00, buff:{atk:+5, def:+3} }
-    };
+// Archetype base stats (starting points)
+const ARCHETYPE_BASE = {
+  guardian: { hp: 90, atk: 55, def: 75, spd: 40, crit: 5,  evade: 5,  control: 5,  dot: 0  },
+  assassin: { hp: 55, atk: 85, def: 45, spd: 85, crit: 20, evade: 15, control: 5,  dot: 0  },
+  skirmish: { hp: 75, atk: 65, def: 60, spd: 80, crit: 10, evade: 10, control: 5,  dot: 0  },
+  plague:   { hp: 50, atk: 55, def: 45, spd: 95, crit: 8,  evade: 12, control: 5,  dot: 25 },
+  control:  { hp: 65, atk: 60, def: 70, spd: 55, crit: 6,  evade: 8,  control: 30, dot: 10 },
+  paladin:  { hp: 95, atk: 60, def: 85, spd: 35, crit: 5,  evade: 5,  control: 8,  dot: 0  },
+};
 
-    // LocalStorage keys
-    const LS_MON = "ml_monsters";
-    const LS_TEAM = "ml_team";
-    const LS_SHARDS = "ml_shards";
+// Element advantages (simple wheel + obvious counters)
+// Advantage = +20% damage; disadvantage = -20%
+const ELEMENT_ADV = {
+  nature: ["earth"],        // roots crack stone
+  earth:  ["air"],          // ground vs wind
+  air:    ["poison"],       // dilute toxins
+  poison: ["nature"],       // blight plants
+  light:  ["shadow"],       // light dispels darkness
+  shadow: ["light"],        // shadow consumes light (symmetry)
+};
 
-    // Globals
-    let model = null;
-    let webcamStream = null;
+// Rarity
+const RARITY = {
+  COMMON: { label:"Common", mult:[1.00, 1.05] },
+  RARE:   { label:"Rare",   mult:[1.20, 1.30] }, // 5% chance
+};
+const RARE_CHANCE = 0.05;
 
-    // UI elements
-    const webcamEl = document.getElementById("webcam");
-    const canvasEl = document.getElementById("canvas");
-    const ctx = canvasEl.getContext("2d");
-    const btnCapture = document.getElementById("btnCapture");
-    const btnRetake = document.getElementById("btnRetake");
-    const captureResult = document.getElementById("captureResult");
-    const errorLog = document.getElementById("errorLog");
+// Storage keys
+const STORE = {
+  COLLECTION: "ml_collection_v1",
+  TEAM:       "ml_team_v1",
+  DUST:       "ml_dust_v1",
+  FAVORITE:   "ml_favorite_v1",
+};
 
-    // =========================
-    // UTILITIES
-    // =========================
-    function logError(msg) {
-      errorLog.style.display = "block";
-      errorLog.textContent = msg;
-      console.error(msg);
-    }
-    function clearError() {
-      errorLog.style.display = "none";
-      errorLog.textContent = "";
-    }
-    function uid() {
-      return "m_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
-    }
-    function rng(min, max) { return Math.floor(Math.random()*(max-min+1))+min; }
+// Globals
+let model = null;
+let stream = null;
+let videoEl = null;
 
-    function loadJSON(key, fallback) {
-      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
-    }
-    function saveJSON(key, obj) {
-      localStorage.setItem(key, JSON.stringify(obj));
-    }
+/* -------------------------------------------------------------------------- */
+/*  Utilities                                                                 */
+/* -------------------------------------------------------------------------- */
 
-    // =========================
-    // STORAGE MODEL
-    // =========================
-    function getCollection() { return loadJSON(LS_MON, []); }
-    function setCollection(arr) { saveJSON(LS_MON, arr); refreshAllViews(); }
+const $ = sel => document.querySelector(sel);
+const el = (tag, props={}, ...kids) => {
+  const n = document.createElement(tag);
+  Object.assign(n, props);
+  for (const k of kids) n.append(k);
+  return n;
+};
+const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const uid = ()=>`m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
 
-    function getTeam() { return loadJSON(LS_TEAM, [null,null,null]); }
-    function setTeam(arr) { saveJSON(LS_TEAM, arr); refreshTeamView(); }
+function sample(multRange){ // pick a multiplier in [a,b]
+  const [a,b] = multRange;
+  return a + Math.random()*(b-a);
+}
 
-    function getShards() { return loadJSON(LS_SHARDS, {}); }
-    function setShards(obj) { saveJSON(LS_SHARDS, obj); refreshShardView(); }
+function modStats(base, mult){
+  const s = {...base};
+  for (const k of Object.keys(s)) s[k] = Math.max(1, Math.round(s[k]*mult));
+  return s;
+}
 
-    function addMonster(mon) {
-      const col = getCollection();
-      col.push(mon);
-      setCollection(col);
-    }
-    function removeMonsterById(id) {
-      const col = getCollection().filter(m => m.id !== id);
-      setCollection(col);
-      // also remove from team if present
-      const team = getTeam().map(t => t === id ? null : t);
-      setTeam(team);
-    }
-    function findMonster(id) { return getCollection().find(m => m.id === id) || null; }
+function headToHead(attacker, defender){
+  // returns damage factor (element advantage)
+  let factor = 1.0;
+  if (ELEMENT_ADV[attacker.element]?.includes(defender.element)) factor *= 1.2;
+  if (ELEMENT_ADV[defender.element]?.includes(attacker.element)) factor *= 0.8;
+  return factor;
+}
 
-    // =========================
-    // MODEL & CAMERA
-    // =========================
-    async function verifyModelFiles() {
-      const files = ["model.json","metadata.json","weights.bin"];
-      for (const f of files) {
-        try {
-          const res = await fetch(MODEL_PATH + f, { cache: "no-store" });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          console.log("Found:", f);
-        } catch (e) {
-          logError(`Missing or inaccessible model file: ${f} — check /${MODEL_PATH}${f}`);
-          throw e;
-        }
-      }
-    }
-
-    async function loadModel() {
-      await verifyModelFiles();
-      model = await tmImage.load(MODEL_PATH + "model.json", MODEL_PATH + "metadata.json");
-      console.log("✅ Model loaded");
-    }
-
-    async function startCamera() {
-      // Must be HTTPS or localhost
-      const isSecure = location.protocol === "https:" || location.hostname === "localhost";
-      if (!isSecure) {
-        logError("Camera requires HTTPS or localhost. If on GitHub Pages you’re good; if testing locally, use a local server.");
-        return;
-      }
-      const constraintsRear = { video: { facingMode: { ideal: "environment" } }, audio: false };
-      const constraintsFront = { video: { facingMode: "user" }, audio: false };
+function resolveImage(labelOrKey){
+  // Try several extensions in order: .png.jpeg, .png, .jpg, .jpeg
+  const base = MONSTER_BOOK[labelOrKey]?.img || labelOrKey;
+  const candidates = [
+    `${IMG_DIR}${base}.png.jpeg`,
+    `${IMG_DIR}${base}.png`,
+    `${IMG_DIR}${base}.jpg`,
+    `${IMG_DIR}${base}.jpeg`,
+  ];
+  return new Promise(async (res)=>{
+    for (const path of candidates){
       try {
-        webcamStream = await navigator.mediaDevices.getUserMedia(constraintsRear);
-      } catch (e) {
-        console.warn("Rear cam failed, trying front:", e);
-        webcamStream = await navigator.mediaDevices.getUserMedia(constraintsFront);
-      }
-      webcamEl.srcObject = webcamStream;
-      await webcamEl.play();
-      console.log("🎥 Camera started");
+        const r = await fetch(path, {cache:"no-store"});
+        if (r.ok) return res(path);
+      } catch(_) {}
     }
+    // fallback emoji image
+    res("data:image/svg+xml;utf8," + encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='140'>
+         <rect width='100%' height='100%' fill='#111'/>
+         <text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle'
+           font-size='28' fill='#888'>🧩</text>
+       </svg>`
+    ));
+  });
+}
 
-    function stopCamera() {
-      if (webcamStream) {
-        webcamStream.getTracks().forEach(t => t.stop());
-        webcamStream = null;
-      }
-      webcamEl.srcObject = null;
+function logError(msg){
+  const box = $("#log");
+  box.style.display = "block";
+  box.textContent = msg;
+}
+function clearError(){ $("#log").style.display = "none"; }
+
+/* -------------------------------------------------------------------------- */
+/*  Storage                                                                   */
+/* -------------------------------------------------------------------------- */
+
+function loadJSON(key, fallback){
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+const store = {
+  get dust(){ return Number(localStorage.getItem(STORE.DUST) ?? 0); },
+  set dust(v){ localStorage.setItem(STORE.DUST, String(v)); refreshHeader(); },
+
+  get collection(){ return loadJSON(STORE.COLLECTION, []); },
+  set collection(v){ saveJSON(STORE.COLLECTION, v); drawCollection(); },
+
+  get team(){ return loadJSON(STORE.TEAM, []); },
+  set team(v){ saveJSON(STORE.TEAM, v); drawTeam(); },
+
+  get favorite(){ return localStorage.getItem(STORE.FAVORITE); },
+  set favorite(id){ localStorage.setItem(STORE.FAVORITE, id ?? ""); refreshHeader(); },
+};
+
+function refreshHeader(){
+  $("#dust").textContent = store.dust;
+  $("#teamCount").textContent = store.team.length;
+  const fav = store.collection.find(c=>c.id===store.favorite);
+  $("#favName").textContent = fav ? fav.name : "None";
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Camera / Model                                                            */
+/* -------------------------------------------------------------------------- */
+
+async function loadModel(){
+  try {
+    // Quick sanity check that files exist
+    for (const f of ["model.json","metadata.json","weights.bin"]){
+      const r = await fetch(MODEL_URL + f, {cache:"no-store"});
+      if (!r.ok) throw new Error(`Missing model file: ${f}`);
     }
+    model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+    console.log("Model loaded", model);
+  } catch (err) {
+    logError("Failed to load model: " + err.message);
+  }
+}
 
-    // =========================
-    // MONSTER GENERATION
-    // =========================
-    function rollStats(base, rarity) {
-      // rarity affects the bonus spread
-      const rarityBoost = { Common: 6, Uncommon: 10, Rare: 16, Epic: 22, Legendary: 30 };
-      const boost = rarityBoost[rarity] ?? 8;
-      return {
-        hp:  base.hp + rng(0, boost),
-        atk: base.atk + rng(0, boost),
-        def: base.def + rng(0, boost),
-        spd: base.spd + rng(0, boost),
-        luk: base.luk + rng(0, boost)
-      };
+async function startCamera(){
+  if (!isSecureContext) $("#httpsWarn").style.display = "block";
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal:"environment" },
+        width: {ideal:1280}, height:{ideal:720}
+      }, audio:false
+    });
+    videoEl.srcObject = stream;
+    await videoEl.play();
+    clearError();
+  } catch (err) {
+    logError(`Camera error: ${err.name} — ${err.message}`);
+  }
+}
+function stopCamera(){
+  if (stream){
+    for (const t of stream.getTracks()) t.stop();
+    stream = null;
+  }
+  videoEl.pause();
+  videoEl.removeAttribute("srcObject");
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Monster Generation                                                        */
+/* -------------------------------------------------------------------------- */
+
+function rollRarity(){
+  return Math.random() < RARE_CHANCE ? "rare" : "common";
+}
+
+function buildStats(label){
+  const spec = MONSTER_BOOK[label];
+  if (!spec) return null;
+  const base = ARCHETYPE_BASE[spec.archetype];
+  if (!base) return null;
+
+  const rar = rollRarity();
+  const pack = rar === "rare" ? RARITY.RARE : RARITY.COMMON;
+  const mult = sample(pack.mult);
+  const stats = modStats(base, mult);
+
+  return {
+    element: spec.element,
+    archetype: spec.archetype,
+    rarity: rar,
+    rarityLabel: pack.label,
+    ...stats,
+    level: 1, xp: 0
+  };
+}
+
+async function makeMonsterFromLabel(label){
+  const spec = MONSTER_BOOK[label];
+  if (!spec) {
+    logError(`No monster mapping for label "${label}"`);
+    return null;
+  }
+  const stats = buildStats(label);
+  const image = await resolveImage(label);
+  return {
+    id: uid(),
+    label, name: spec.name,
+    image, ...stats,
+    caughtAt: Date.now()
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Prediction                                                                */
+/* -------------------------------------------------------------------------- */
+
+async function predictFromCanvas(canvas){
+  if (!model){ await loadModel(); if (!model) return; }
+  const preds = await model.predict(canvas);
+  preds.sort((a,b)=>b.probability-a.probability);
+  const top = preds[0];
+  if (!top) { logError("No prediction result."); return; }
+  const label = top.className?.toLowerCase();
+  if (!label){ logError("Empty predicted label."); return; }
+  clearError();
+
+  const monster = await makeMonsterFromLabel(label);
+  if (!monster) return;
+
+  // Add to collection
+  const col = store.collection;
+  col.unshift(monster);
+  store.collection = col;
+}
+
+function drawFromVideo(){
+  const c = document.createElement("canvas");
+  c.width = videoEl.videoWidth || 640;
+  c.height = videoEl.videoHeight || 480;
+  c.getContext("2d").drawImage(videoEl, 0, 0, c.width, c.height);
+  return c;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  UI: Collection / Team                                                     */
+/* -------------------------------------------------------------------------- */
+
+function drawTeam(){
+  const root = $("#team");
+  root.innerHTML = "";
+  const team = store.team.map(id => store.collection.find(m=>m.id===id)).filter(Boolean);
+  for (let i=0;i<3;i++){
+    const mon = team[i];
+    const slot = el("div",{className:"team-slot" + (mon?" filled":"")});
+    if (mon){
+      slot.append(
+        el("div",{}, el("div",{style:"font-weight:700"}, mon.name),
+          el("div",{className:"small"}, `Lv ${mon.level} • ${mon.element}`))
+      );
+    }else{
+      slot.textContent = "Empty";
     }
+    root.append(slot);
+  }
+  refreshHeader();
+}
 
-    function createMonsterFromSpecies(speciesKey) {
-      const tmpl = SPECIES[speciesKey];
-      const id = uid();
-      const stats = rollStats(tmpl.base, tmpl.rarity);
-      return {
-        id,
-        species: speciesKey,
-        rarity: tmpl.rarity,
-        img: tmpl.img,
-        level: 1,
-        xp: 0,
-        statsMax: {...stats}, // for healing between battles
-        statsCur: {...stats},
-        caughtAt: Date.now()
-      };
-    }
-
-    // =========================
-    // CAPTURE FLOW
-    // =========================
-    async function captureAndClassify() {
-      clearError();
-      if (!webcamStream) { logError("No webcam stream available."); return; }
-
-      // Draw current video frame to canvas
-      canvasEl.width = webcamEl.videoWidth;
-      canvasEl.height = webcamEl.videoHeight;
-      ctx.drawImage(webcamEl, 0, 0, canvasEl.width, canvasEl.height);
-
-      // Stop stream to enforce one-time capture
-      stopCamera();
-
-      try {
-        const preds = await model.predict(canvasEl);
-        preds.sort((a,b) => b.probability - a.probability);
-        const top = (preds[0]?.className || "").toLowerCase().trim();
-        const conf = preds[0]?.probability || 0;
-        console.log("Top class:", top, conf);
-
-        if (!SPECIES[top]) {
-          captureResult.style.display = "block";
-          captureResult.innerHTML = `
-            <div class="kv"><div>Result</div><div>Unknown: "${top}"</div></div>
-            <p class="label">Tip: Make sure your Teachable Machine class name exactly matches a key in SPECIES (lowercase).</p>
-          `;
-          return;
-        }
-
-        const mon = createMonsterFromSpecies(top);
-        addMonster(mon); // persist
-        renderCaptureResult(mon, conf);
-
-      } catch (e) {
-        logError("Prediction failed. Ensure your model was exported for web and image size matches typical webcam frames.");
-        console.error(e);
-      }
-    }
-
-    function renderCaptureResult(mon, confidence) {
-      captureResult.style.display = "block";
-      captureResult.innerHTML = `
-        <div class="row">
-          <img src="${mon.img}" alt="${mon.species}" style="max-width:200px; border-radius:12px;">
-          <div class="stack" style="min-width:220px;">
-            <div><span class="pill">${mon.rarity}</span> <span class="pill">Lv ${mon.level}</span></div>
-            <div class="kv"><div>Species</div><div>${mon.species}</div></div>
-            <div class="kv"><div>Confidence</div><div>${(confidence*100).toFixed(1)}%</div></div>
-            <div class="kv"><div>HP</div><div>${mon.statsCur.hp}</div></div>
-            <div class="kv"><div>ATK</div><div>${mon.statsCur.atk}</div></div>
-            <div class="kv"><div>DEF</div><div>${mon.statsCur.def}</div></div>
-            <div class="kv"><div>SPD</div><div>${mon.statsCur.spd}</div></div>
-            <div class="kv"><div>LUK</div><div>${mon.statsCur.luk}</div></div>
-            <div class="row">
-              <button class="btn success" onclick="goTab('collection')">View in Collection</button>
-              <button class="btn" onclick="goTab('battle')">Try Wild Battle</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    // =========================
-    // COLLECTION & SHARDS
-    // =========================
-    function refreshCollectionView() {
-      const grid = document.getElementById("collectionGrid");
-      const col = getCollection();
-      if (!col.length) { grid.innerHTML = `<p class="label">No monsters yet — go to Capture!</p>`; return; }
-
-      grid.innerHTML = col.map(m => {
-        const inTeam = getTeam().includes(m.id);
-        return `
-          <div class="card">
-            <img src="${m.img}" alt="${m.species}" style="width:100%; max-height:140px; object-fit:contain;">
-            <div class="kv"><div>ID</div><div style="font-family:monospace;">${m.id}</div></div>
-            <div class="kv"><div>Species</div><div>${m.species}</div></div>
-            <div class="kv"><div>Rarity</div><div>${m.rarity}</div></div>
-            <div class="kv"><div>Level</div><div>${m.level} (XP ${m.xp})</div></div>
-            <div class="kv"><div>HP</div><div>${m.statsCur.hp}/${m.statsMax.hp}</div></div>
-            <div class="kv"><div>ATK</div><div>${m.statsCur.atk}</div></div>
-            <div class="kv"><div>DEF</div><div>${m.statsCur.def}</div></div>
-            <div class="kv"><div>SPD</div><div>${m.statsCur.spd}</div></div>
-            <div class="kv"><div>LUK</div><div>${m.statsCur.luk}</div></div>
-            <div class="row" style="margin-top:8px;">
-              <button class="btn" onclick="toggleTeam('${m.id}')">${inTeam ? 'Remove from Team' : 'Add to Team'}</button>
-              <button class="btn danger" onclick="breakDown('${m.id}')">Break Down</button>
-            </div>
-            ${upgradeButtonHTML(m)}
-          </div>
-        `;
-      }).join("");
-    }
-
-    function upgradeButtonHTML(m) {
-      const shards = getShards();
-      const have = shards[m.species] || 0;
-      const cost = upgradeCost(m.level);
-      const can = have >= cost;
-      return `
-        <div class="row" style="margin-top:6px;">
-          <div class="pill">Shards: ${have}/${cost}</div>
-          <button class="btn ${can ? 'success' : ''}" ${can ? '' : 'disabled'} onclick="upgradeMonster('${m.id}')">Upgrade</button>
-        </div>
-      `;
-    }
-
-    function refreshShardView() {
-      const box = document.getElementById("shardList");
-      const s = getShards();
-      const keys = Object.keys(SPECIES);
-      if (!keys.length) { box.innerHTML = "<p class='label'>No species configured.</p>"; return; }
-      box.innerHTML = keys.map(k => {
-        const have = s[k] || 0;
-        return `<div class="kv"><div>${k}</div><div>${have} shards</div></div>`;
-      }).join("");
-    }
-
-    function toggleTeam(monId) {
-      const team = getTeam();
-      const idx = team.indexOf(monId);
-      if (idx >= 0) {
-        team[idx] = null;
-        setTeam(team);
-        refreshCollectionView();
-        return;
-      }
-      // add to first free slot
-      const free = team.indexOf(null);
-      if (free === -1) { alert("Team is full. Remove one first."); return; }
-      team[free] = monId;
-      setTeam(team);
-      refreshCollectionView();
-    }
-
-    function refreshTeamView() {
-      const teamBox = document.getElementById("teamSlots");
-      const slots = Array.from(teamBox.querySelectorAll(".team-slot"));
-      const team = getTeam();
-      const col = getCollection();
-      slots.forEach((slotDiv, i) => {
-        const id = team[i];
-        if (!id) { slotDiv.textContent = "Empty"; return; }
-        const m = col.find(x => x.id === id);
-        slotDiv.innerHTML = m ? `
-          <div><strong>${m.species}</strong> — Lv ${m.level}</div>
-          <div>HP ${m.statsCur.hp}/${m.statsMax.hp} • ATK ${m.statsCur.atk} • DEF ${m.statsCur.def}</div>
-        ` : "Empty";
-      });
-
-      // also refresh selects used for battle & pvp
-      const battleSel = document.getElementById("battleMySelect");
-      const p1Sel = document.getElementById("p1Select");
-      const p2Sel = document.getElementById("p2Select");
-
-      const options = col.map(m => `<option value="${m.id}">${m.species} — Lv ${m.level} — ${m.id}</option>`).join("");
-      battleSel.innerHTML = `<option value="">Select...</option>` + options;
-      p1Sel.innerHTML = `<option value="">Select...</option>` + options;
-      p2Sel.innerHTML = `<option value="">Select...</option>` + options;
-    }
-
-    function breakDown(monId) {
-      const m = findMonster(monId);
-      if (!m) return;
-      const tmpl = SPECIES[m.species];
-      const shards = getShards();
-      shards[m.species] = (shards[m.species] || 0) + (tmpl.shardsOnBreak || 10);
-      setShards(shards);
-      removeMonsterById(monId);
-      refreshCollectionView();
-    }
-
-    function upgradeCost(level) { return 20 + (level - 1) * 10; }
-
-    function upgradeMonster(monId) {
-      const m = findMonster(monId);
-      if (!m) return;
-      const shards = getShards();
-      const cost = upgradeCost(m.level);
-      const have = shards[m.species] || 0;
-      if (have < cost) { alert("Not enough shards."); return; }
-      shards[m.species] = have - cost;
-      setShards(shards);
-
-      // increase level and stats
-      m.level += 1;
-      const inc = { hp: rng(6,12), atk: rng(3,6), def: rng(3,6), spd: rng(2,5), luk: rng(2,5) };
-      m.statsMax.hp += inc.hp; m.statsMax.atk += inc.atk; m.statsMax.def += inc.def; m.statsMax.spd += inc.spd; m.statsMax.luk += inc.luk;
-      m.statsCur = { ...m.statsMax }; // heal on upgrade
-      // persist
-      const col = getCollection().map(x => x.id === m.id ? m : x);
-      setCollection(col);
-      refreshCollectionView();
-    }
-
-    // =========================
-    // BATTLE SYSTEM (Wild & PvP)
-    // =========================
-    function calcDamage(attacker, defender, moveKey) {
-      const move = MOVES[moveKey];
-      // miss?
-      if (Math.random() > move.acc) return { dmg: 0, miss: true, name: move.name };
-      if (move.buff) {
-        attacker.statsCur.atk += move.buff.atk || 0;
-        attacker.statsCur.def += move.buff.def || 0;
-        return { dmg: 0, buff: move.buff, name: move.name };
-      }
-      const atk = attacker.statsCur.atk;
-      const def = defender.statsCur.def;
-      const base = Math.max(1, Math.round(atk * move.power - def * 0.3));
-      const variance = rng(-3, 3);
-      const crit = Math.random() < Math.min(0.35, 0.05 + attacker.statsCur.luk/100) ? 1.5 : 1;
-      const dmg = Math.max(1, Math.round((base + variance) * crit));
-      defender.statsCur.hp = Math.max(0, defender.statsCur.hp - dmg);
-      return { dmg, crit: crit>1, name: move.name };
-    }
-
-    function monsterCopy(m) { return JSON.parse(JSON.stringify(m)); }
-    function healFull(m) { m.statsCur = { ...m.statsMax }; return m; }
-
-    // --- Wild Battle ---
-    document.getElementById("btnStartWild").addEventListener("click", () => {
-      const id = document.getElementById("battleMySelect").value;
-      const my = findMonster(id);
-      if (!my) { alert("Pick your fighter."); return; }
-
-      // enemy spawns around your level (+/-1)
-      const keys = Object.keys(SPECIES);
-      const sp = keys[rng(0, keys.length-1)];
-      const enemy = createMonsterFromSpecies(sp);
-      enemy.level = Math.max(1, my.level + rng(-1, 1));
-      // scale enemy slightly with level
-      enemy.statsMax.hp += enemy.level * 4; enemy.statsMax.atk += enemy.level * 2; enemy.statsMax.def += enemy.level * 2;
-      enemy.statsCur = { ...enemy.statsMax };
-
-      runBattle("battleArea", monsterCopy(healFull(my)), enemy, (result) => {
-        // On battle end, award XP or shards
-        if (result === "win") {
-          const inc = rng(8, 16);
-          my.xp += inc;
-          // level up when XP >= 100
-          while (my.xp >= 100) {
-            my.xp -= 100;
-            my.level += 1;
-            my.statsMax.hp += rng(6,10);
-            my.statsMax.atk += rng(3,6);
-            my.statsMax.def += rng(3,6);
-            my.statsMax.spd += rng(2,5);
-            my.statsMax.luk += rng(1,4);
+function drawCollection(){
+  const root = $("#collection");
+  root.innerHTML = "";
+  for (const m of store.collection){
+    const head = el("div",{className:"card-head"},
+      el("div",{style:"font-weight:700; flex:1"}, `${m.name}`),
+      el("span",{className:"rarity " + (m.rarity==="rare"?"rare":"")}, m.rarityLabel),
+    );
+    const img = el("div",{className:"imgbox"}, el("img",{src:m.image,alt:m.name}));
+    const stats = el("div",{className:"pad"},
+      el("div",{className:"kv"},
+        el("div",{}, "HP"), el("div",{}, String(m.hp)),
+        el("div",{}, "ATK"), el("div",{}, String(m.atk)),
+        el("div",{}, "DEF"), el("div",{}, String(m.def)),
+        el("div",{}, "SPD"), el("div",{}, String(m.spd)),
+        el("div",{}, "CRIT"), el("div",{}, String(m.crit)),
+        el("div",{}, "EVADE"), el("div",{}, String(m.evade)),
+      ),
+      el("div",{className:"small", style:"margin-top:6px"},
+        `Element: ${m.element} • Archetype: ${m.archetype}`),
+      el("div",{className:"act"},
+        // Assign to team
+        el("button",{onclick:()=>{
+          const t = store.team.slice();
+          if (t.includes(m.id)) {
+            // remove
+            const idx = t.indexOf(m.id); t.splice(idx,1);
+          } else {
+            if (t.length>=3) { alert("Team is full. Remove another first."); return; }
+            t.push(m.id);
           }
-          my.statsCur = { ...my.statsMax }; // heal after wild fight
-          const col = getCollection().map(x => x.id === my.id ? my : x);
-          setCollection(col);
-          alert(`You won! +${inc} XP to ${my.species}.`);
-        } else if (result === "lose") {
-          const shards = getShards();
-          shards[enemy.species] = (shards[enemy.species]||0) + 4; // consolation shards
-          setShards(shards);
-          alert("You lost. Earned a few shards anyway.");
-        } else {
-          // draw
-          alert("It’s a draw!");
-        }
-      });
-    });
+          store.team = t;
+        }}, store.team.includes(m.id) ? "Remove from Team" : "Add to Team"),
 
-    // --- Local PvP (same device) ---
-    document.getElementById("btnStartPVP").addEventListener("click", () => {
-      const p1 = findMonster(document.getElementById("p1Select").value);
-      const p2 = findMonster(document.getElementById("p2Select").value);
-      if (!p1 || !p2) { alert("Select both Player 1 and Player 2 monsters."); return; }
-      runBattle("pvpArea", monsterCopy(healFull(p1)), monsterCopy(healFull(p2)), (result) => {
-        alert(result === "win" ? "Player 1 wins!" : result === "lose" ? "Player 2 wins!" : "Draw!");
-      }, true);
-    });
+        // Favorite
+        el("button",{onclick:()=>{ store.favorite = m.id; }}, store.favorite===m.id?"★ Favorite":"☆ Make Favorite"),
 
-    function runBattle(containerId, Aorig, Borig, onEnd, pvp=false) {
-      const A = Aorig, B = Borig;
-      const el = document.getElementById(containerId);
-      let turn = 1; // odd -> A, even -> B
-      el.innerHTML = renderBattleUI(A,B, turn, pvp);
+        // Upgrade
+        el("button",{onclick:()=>{
+          const cost = 10 * m.level;
+          if (store.dust < cost) { alert(`Need ${cost} dust.`); return; }
+          store.dust = store.dust - cost;
+          m.level += 1;
+          m.hp = Math.round(m.hp * 1.06);
+          m.atk = Math.round(m.atk * 1.05);
+          m.def = Math.round(m.def * 1.05);
+          m.spd = Math.round(m.spd * 1.03);
+          store.collection = store.collection.map(x=>x.id===m.id?m:x);
+        }}, "Upgrade"),
 
-      function refresh() { el.innerHTML = renderBattleUI(A,B, turn, pvp); attachMoveHandlers(); }
+        // Break down
+        el("button",{onclick:()=>{
+          if (!confirm("Break down this monster for dust? This cannot be undone.")) return;
+          const gain = m.rarity==="rare" ? 25 : 10;
+          store.dust = store.dust + gain;
+          store.collection = store.collection.filter(x=>x.id!==m.id);
+          store.team = store.team.filter(id=>id!==m.id);
+          if (store.favorite===m.id) store.favorite = "";
+        }}, "Break Down"),
+      )
+    );
+    const card = el("div",{className:"card"}, head, img, stats);
+    root.append(card);
+  }
+  drawTeam();
+}
 
-      function attachMoveHandlers() {
-        const myMoves = el.querySelectorAll("[data-move]");
-        myMoves.forEach(btn => btn.addEventListener("click", () => {
-          const mkey = btn.getAttribute("data-move");
-          stepTurn(mkey);
-        }));
-      }
+/* -------------------------------------------------------------------------- */
+/*  Wild Battle (local demo)                                                  */
+/* -------------------------------------------------------------------------- */
 
-      function stepTurn(moveKey) {
-        const attacker = (turn % 2 === 1) ? A : B;
-        const defender = (turn % 2 === 1) ? B : A;
+function pickTeamFighter(){
+  const team = store.team.map(id => store.collection.find(m=>m.id===id)).filter(Boolean);
+  return team[0] || team[1] || team[2] || store.collection[0] || null;
+}
 
-        let log = el.querySelector(".log");
-        // attacker acts
-        const res = calcDamage(attacker, defender, moveKey);
-        log.textContent += `${attacker.species} used ${res.name}! `;
-        if (res.miss) log.textContent += "It missed.\n";
-        else if (res.buff) log.textContent += `Buffed! (+ATK ${res.buff.atk||0}, +DEF ${res.buff.def||0})\n`;
-        else {
-          if (res.crit) log.textContent += "Critical hit! ";
-          log.textContent += `Dealt ${res.dmg} damage.\n`;
-        }
+function simulateBattle(a,b){
+  // Simple score function using stats + element factor
+  const f = headToHead(a,b);
+  const aScore = a.atk*1.1 + a.def*0.9 + a.spd*0.8 + a.hp*0.8 + a.crit*0.5 + a.evade*0.5;
+  const bScore = b.atk*1.1 + b.def*0.9 + b.spd*0.8 + b.hp*0.8 + b.crit*0.5 + b.evade*0.5;
+  const aAdj = aScore * f * (1 + Math.random()*0.1);
+  const bAdj = bScore * (1 + Math.random()*0.1);
+  return aAdj >= bAdj ? "A" : "B";
+}
 
-        // check KO
-        if (defender.statsCur.hp <= 0 && attacker.statsCur.hp <= 0) { onEnd?.("draw"); refresh(); return; }
-        if (defender.statsCur.hp <= 0) { onEnd?.(turn % 2 === 1 ? "win" : "lose"); refresh(); return; }
+async function wildBattle(){
+  const me = pickTeamFighter();
+  if (!me){ alert("You need a monster (or a team member) to fight!"); return; }
 
-        turn += 1; // next player
-        refresh();
-      }
+  // Make a random wild opponent from your book
+  const labels = Object.keys(MONSTER_BOOK);
+  const randLabel = labels[randInt(0,labels.length-1)];
+  const foe = await makeMonsterFromLabel(randLabel);
 
-      attachMoveHandlers();
-    }
+  const who = simulateBattle(me, foe);
+  const win = (who==="A");
 
-    function renderBattleUI(A,B, turn, pvp) {
-      const myTurn = (turn % 2 === 1) ? "A" : "B";
-      const who = myTurn === "A" ? A : B;
-      const title = pvp ? (myTurn === "A" ? "Player 1 turn" : "Player 2 turn") : (myTurn === "A" ? "Your turn" : "Enemy turn");
+  alert(`${me.name} (You) ${win ? "defeated" : "lost to"} ${foe.name} (Wild)!
+${win ? "+10 dust earned." : "+3 dust earned."}`);
 
-      return `
-        <div class="row">
-          <div class="card" style="flex:1;">
-            <div class="section-title">${A.species} (Lv ${A.level})</div>
-            <img src="${A.img}" alt="${A.species}" style="max-height:120px; object-fit:contain;">
-            <div class="kv"><div>HP</div><div>${A.statsCur.hp}/${A.statsMax.hp}</div></div>
-            <div class="kv"><div>ATK</div><div>${A.statsCur.atk}</div></div>
-            <div class="kv"><div>DEF</div><div>${A.statsCur.def}</div></div>
-          </div>
-          <div class="card" style="flex:1;">
-            <div class="section-title">${B.species} (Lv ${B.level})</div>
-            <img src="${B.img}" alt="${B.species}" style="max-height:120px; object-fit:contain;">
-            <div class="kv"><div>HP</div><div>${B.statsCur.hp}/${B.statsMax.hp}</div></div>
-            <div class="kv"><div>ATK</div><div>${B.statsCur.atk}</div></div>
-            <div class="kv"><div>DEF</div><div>${B.statsCur.def}</div></div>
-          </div>
-        </div>
+  store.dust = store.dust + (win ? 10 : 3);
+}
 
-        <div class="card">
-          <div class="section-title">${title}</div>
-          <div class="moves">
-            ${myTurn === "A" || pvp ? `
-              <button class="btn" data-move="quick">${MOVES.quick.name}</button>
-              <button class="btn" data-move="heavy">${MOVES.heavy.name}</button>
-              <button class="btn" data-move="focus">${MOVES.focus.name}</button>
-            ` : `<em class="label">Waiting for opponent...</em>`}
-          </div>
-          <div class="log" style="margin-top:8px;"></div>
-        </div>
-      `;
-    }
+/* -------------------------------------------------------------------------- */
+/*  Wire-up                                                                   */
+/* -------------------------------------------------------------------------- */
 
-    // =========================
-    // TABS
-    // =========================
-    function goTab(name) {
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
-      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
-      // small UX extras
-      if (name === "capture") {
-        btnCapture.disabled = false;
-        btnRetake.style.display = "none";
-        captureResult.style.display = "none";
-        startCamera();
-      } else {
-        stopCamera();
-      }
-    }
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-      btn.addEventListener("click", () => goTab(btn.dataset.tab));
-    });
+async function onCaptureClick(){
+  if (stream && !videoEl.paused && !videoEl.ended){
+    const c = drawFromVideo();
+    await predictFromCanvas(c);
+  }else{
+    logError("No webcam stream available.");
+  }
+}
 
-    // =========================
-    // INIT + BUTTONS
-    // =========================
-    btnCapture.addEventListener("click", async () => {
-      btnCapture.disabled = true;
-      await captureAndClassify();         // one-time capture
-      btnRetake.style.display = "inline-block";
-    });
+function onUploadFile(ev){
+  const file = ev.target.files?.[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = async ()=>{
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    c.getContext("2d").drawImage(img,0,0);
+    await predictFromCanvas(c);
+  };
+  img.src = URL.createObjectURL(file);
+}
 
-    btnRetake.addEventListener("click", async () => {
-      captureResult.style.display = "none";
-      btnRetake.style.display = "none";
-      btnCapture.disabled = false;
-      await startCamera();                // restart camera for a new capture
-    });
+async function boot(){
+  videoEl = $("#webcam");
+  refreshHeader();
+  drawCollection();
 
-    async function init() {
-      try {
-        await loadModel();                // load TM model
-        await startCamera();              // start camera on Capture tab
-        refreshAllViews();                // draw UI from localStorage
-      } catch (e) {
-        console.warn("Init warning:", e);
-      }
-    }
+  await loadModel(); // load early so first prediction is fast
 
-    function refreshAllViews() {
-      refreshCollectionView();
-      refreshTeamView();
-      refreshShardView();
-    }
+  $("#btnEnable").addEventListener("click", startCamera);
+  $("#btnStop").addEventListener("click", stopCamera);
+  $("#btnCapture").addEventListener("click", onCaptureClick);
+  $("#fileInput").addEventListener("change", onUploadFile);
 
-    // Kick off
-    init();
-  </script>
+  // Footer
+  $("#navWild").addEventListener("click", wildBattle);
+  $("#navCapture").addEventListener("click", ()=>window.scrollTo({top:0,behavior:"smooth"}));
+  $("#navCollection").addEventListener("click", ()=>document.querySelector("#collection").scrollIntoView({behavior:"smooth"}));
+  $("#navTeam").addEventListener("click", ()=>document.querySelector("#team").scrollIntoView({behavior:"smooth"}));
+
+  if (!isSecureContext) $("#httpsWarn").style.display = "block";
+}
+boot();
+</script>
 </body>
 </html>
-
